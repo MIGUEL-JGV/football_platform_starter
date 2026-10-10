@@ -7,7 +7,9 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { HealthModule } from './health/health.module';
 import { OrganizationsModule } from './organizations/organizations.module';
+import { PlayersModule } from './players/players.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { TeamsModule } from './teams/teams.module';
 import { TournamentsModule } from './tournaments/tournaments.module';
 
 @Module({
@@ -20,6 +22,8 @@ import { TournamentsModule } from './tournaments/tournaments.module';
     AuthModule,
     OrganizationsModule,
     TournamentsModule,
+    TeamsModule,
+    PlayersModule,
     HealthModule,
   ],
   providers: [

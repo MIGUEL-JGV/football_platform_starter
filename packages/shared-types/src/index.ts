@@ -30,6 +30,24 @@ export interface ListTournamentsParams {
   pageSize?: number;
 }
 
+export interface PublicTeamCard {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  logoUrl: string | null;
+  creatorName: string;
+  entryCount: number;
+}
+
+export interface PublicPlayerCard {
+  id: string;
+  displayName: string;
+  dateOfBirth: string | null;
+  photoUrl: string | null;
+  preferredPosition: string | null;
+}
+
 export interface Paginated<T> {
   items: T[];
   total: number;

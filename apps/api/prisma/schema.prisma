@@ -83,6 +83,7 @@ model User {
   tournamentRoles TournamentMember[]
   follows         TournamentFollow[]
   createdTeams    Team[]               @relation("TeamCreator")
+  createdPlayers  Player[]             @relation("PlayerCreator")
   requestedEntries TournamentTeam[]    @relation("RegistrationRequester")
   approvedEntries TournamentTeam[]     @relation("RegistrationApprover")
   recordedMatches Match[]              @relation("MatchRecorder")
@@ -217,8 +218,10 @@ model Player {
   dateOfBirth       DateTime?   @map("date_of_birth") @db.Date
   photoUrl          String?     @map("photo_url")
   preferredPosition String?     @map("preferred_position") @db.VarChar(40)
+  createdBy         String      @map("created_by") @db.Uuid
   createdAt         DateTime    @default(now()) @map("created_at") @db.Timestamptz
   updatedAt         DateTime    @updatedAt @map("updated_at") @db.Timestamptz
+  creator           User        @relation("PlayerCreator", fields: [createdBy], references: [id])
   rosters           TeamRoster[]
 
   @@map("players")
