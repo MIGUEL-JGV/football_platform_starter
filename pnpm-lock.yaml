@@ -86,6 +86,9 @@ importers:
 
   apps/mobile:
     dependencies:
+      '@babel/runtime':
+        specifier: ^8.0.7
+        version: 8.0.7
       expo:
         specifier: ~53.0.0
         version: 53.0.27(@babel/core@7.29.7)(react-native@0.79.0(@babel/core@7.29.7)(@types/react@19.0.14)(react@19.0.0))(react@19.0.0)
@@ -108,6 +111,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@football/shared-types':
+        specifier: workspace:^
+        version: link:../../packages/shared-types
       next:
         specifier: ^15.0.0
         version: 15.5.27(@types/node@22.20.5)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
@@ -665,6 +671,9 @@ packages:
   '@babel/runtime@7.29.10':
     resolution: {integrity: sha512-NpugTzbKgGrNe45Ui32cN8vCFFMxVtP/9rtfwv0nP5FRDAjvYBxJcLVpYA9mr1jxP6cnIT7x9LUzuDTbWYYNRA==}
     engines: {node: '>=6.9.0'}
+
+  '@babel/runtime@8.0.7':
+    resolution: {integrity: sha512-k0hagDDq/6w4v+0Sp4wFvIz/yswH5O7Va6aRTnD7N62Tnborp4X+YB+H3XUcWVSR4aE47WPEXiIIZchBs0GmYg==}
 
   '@babel/template@7.29.7':
     resolution: {integrity: sha512-puq+Gf35oI24FeN11LkoUQFqv9uwNeWpxXZi/Ji3rRIoKAzKnxRaZ+Gkj0vKS9ZCiTESfng1N9LyOyXvo+m+Gg==}
@@ -5702,6 +5711,8 @@ snapshots:
       - supports-color
 
   '@babel/runtime@7.29.10': {}
+
+  '@babel/runtime@8.0.7': {}
 
   '@babel/template@7.29.7':
     dependencies:

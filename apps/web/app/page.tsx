@@ -1,12 +1,20 @@
 import Link from 'next/link';
+import type { CSSProperties } from 'react';
+import { listTournaments } from '../lib/api';
+import { formatDateRange, formatFootball, formatStatus } from '../lib/format';
+import type { PublicTournamentCard } from '@football/shared-types';
 
-const sampleTournaments = [
-  { name: 'Copa Metropolitana', format: 'Fútbol 7', status: 'Inscripciones abiertas', teams: 12 },
-  { name: 'Liga Regional', format: 'Fútbol 11', status: 'En preparación', teams: 16 },
-  { name: 'Copa Relámpago', format: 'Fútbol 5', status: 'Próximamente', teams: 8 },
-];
+const emptyCatalog: PublicTournamentCard[] = [];
 
-export default function HomePage() {
+export default async function HomePage() {
+  let cards: PublicTournamentCard[] = emptyCatalog;
+  try {
+    const result = await listTournaments({ pageSize: 6 });
+    cards = result.items;
+  } catch {
+    cards = emptyCatalog;
+  }
+
   return (
     <main className="page">
       <header className="topbar">
@@ -18,16 +26,34 @@ export default function HomePage() {
         <p className="eyebrow">TODO EL FÚTBOL, EN UN SOLO LUGAR</p>
         <h1>Encuentra tu próximo<br/><span>torneo.</span></h1>
         <p className="intro">Consulta calendarios, equipos, resultados y clasificaciones de torneos de fútbol.</p>
-        <div className="search"><span>⌕</span><input aria-label="Buscar torneos" placeholder="Busca un torneo, equipo u organización"/><button>Buscar</button></div>
+        <form className="search" action="/tournaments" method="get">
+          <span>⌕</span>
+          <input aria-label="Buscar torneos" name="q" placeholder="Busca un torneo, equipo u organización"/>
+          <button type="submit">Buscar</button>
+        </form>
       </section>
       <section id="torneos" className="section">
         <div className="section-heading"><div><p className="eyebrow">CATÁLOGO</p><h2>Torneos para descubrir</h2></div><Link href="/tournaments">Ver todos ↗</Link></div>
-        <div className="cards">
-          {sampleTournaments.map((t, i) => <article className="tournament-card" key={t.name}>
-            <div className={`card-art art-${i + 1}`}><span className="sport-tag">{t.format}</span><span className="ball">⚽</span></div>
-            <div className="card-body"><span className="status-dot">{t.status}</span><h3>{t.name}</h3><p>{t.teams} equipos · Organizador de ejemplo</p><Link href={`/tournaments/${i + 1}`}>Ver torneo <span>↗</span></Link></div>
-          </article>)}
-        </div>
+        {cards.length === 0 ? (
+          <p className="empty">Aún no hay torneos publicados.</p>
+        ) : (
+          <div className="cards">
+            {cards.map((t, i) => (
+              <article className="tournament-card" key={t.id}>
+                <div className={`card-art art-${(i % 3) + 1}`} style={backgroundStyle(t)}>
+                  <span className="sport-tag">{formatFootball(t.format)}</span>
+                  <span className="ball">⚽</span>
+                </div>
+                <div className="card-body">
+                  <span className="status-dot">{formatStatus(t.status)}</span>
+                  <h3>{t.name}</h3>
+                  <p>{t.organizationName} · {formatDateRange(t.startDate, t.endDate)}</p>
+                  <Link href={`/tournaments/${t.id}`}>Ver torneo <span>↗</span></Link>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
       </section>
       <section id="mis-torneos" className="personal">
         <div><p className="eyebrow">TU ESPACIO</p><h2>Todos tus torneos,<br/>en un solo lugar.</h2><p>Administra tus competiciones, consulta los torneos en los que participas y sigue tus favoritos.</p></div>
@@ -36,4 +62,9 @@ export default function HomePage() {
       <footer><Link className="brand" href="/">CANCHA<span>+</span></Link><p>Plataforma de torneos de fútbol · Prototipo inicial</p></footer>
     </main>
   );
+}
+
+function backgroundStyle(tournament: PublicTournamentCard): CSSProperties | undefined {
+  const url = tournament.coverUrl ?? tournament.logoUrl;
+  return url ? { backgroundImage: `url(${url})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined;
 }

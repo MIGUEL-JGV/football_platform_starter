@@ -21,6 +21,23 @@ export interface PublicTournamentCard {
   coverUrl: string | null;
 }
 
+export interface ListTournamentsParams {
+  q?: string;
+  status?: TournamentStatus;
+  format?: FootballFormat;
+  organizationId?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface Paginated<T> {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
 export interface ApiError {
   statusCode: number;
   code: string;
