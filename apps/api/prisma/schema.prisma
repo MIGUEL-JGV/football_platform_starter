@@ -1,0 +1,409 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum AccountStatus {
+  active
+  suspended
+  deleted
+}
+
+enum OrganizationRole {
+  owner
+  admin
+  editor
+}
+
+enum TournamentRole {
+  manager
+  scorekeeper
+  viewer
+}
+
+enum TournamentVisibility {
+  public
+  private
+  unlisted
+}
+
+enum TournamentStatus {
+  draft
+  registration
+  upcoming
+  in_progress
+  completed
+  cancelled
+}
+
+enum FootballFormat {
+  football_11
+  football_7
+  football_5
+}
+
+enum MembershipStatus {
+  pending
+  active
+  rejected
+  suspended
+}
+
+enum PhaseType {
+  league
+  group_stage
+  knockout
+}
+
+enum MatchStatus {
+  scheduled
+  postponed
+  in_progress
+  pending_validation
+  finished
+  cancelled
+  abandoned
+}
+
+model User {
+  id              String               @id @default(uuid()) @db.Uuid
+  email           String               @unique
+  displayName     String               @map("display_name") @db.VarChar(120)
+  passwordHash    String?              @map("password_hash")
+  status          AccountStatus        @default(active)
+  emailVerifiedAt DateTime?            @map("email_verified_at") @db.Timestamptz
+  createdAt       DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime             @updatedAt @map("updated_at") @db.Timestamptz
+  identities      AuthIdentity[]
+  orgMemberships  OrganizationMember[]
+  tournamentRoles TournamentMember[]
+  follows         TournamentFollow[]
+  createdTeams    Team[]               @relation("TeamCreator")
+  requestedEntries TournamentTeam[]    @relation("RegistrationRequester")
+  approvedEntries TournamentTeam[]     @relation("RegistrationApprover")
+  recordedMatches Match[]              @relation("MatchRecorder")
+  validatedMatches Match[]             @relation("MatchValidator")
+  newsPosts       NewsPost[]
+  notifications   Notification[]
+
+  @@map("users")
+}
+
+model AuthIdentity {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  provider        String   @db.VarChar(20)
+  providerSubject String   @map("provider_subject")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerSubject])
+  @@unique([userId, provider])
+  @@map("auth_identities")
+}
+
+model Organization {
+  id           String               @id @default(uuid()) @db.Uuid
+  name         String               @db.VarChar(150)
+  slug         String               @unique @db.VarChar(180)
+  description  String?
+  logoUrl      String?              @map("logo_url")
+  contactEmail String?              @map("contact_email") @db.VarChar(320)
+  status       String               @default("active") @db.VarChar(20)
+  createdBy    String               @map("created_by") @db.Uuid
+  createdAt    DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime             @updatedAt @map("updated_at") @db.Timestamptz
+  members      OrganizationMember[]
+  tournaments  Tournament[]
+
+  @@map("organizations")
+}
+
+model OrganizationMember {
+  organizationId String           @map("organization_id") @db.Uuid
+  userId         String           @map("user_id") @db.Uuid
+  role           OrganizationRole
+  status         MembershipStatus @default(active)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([organizationId, userId])
+  @@map("organization_members")
+}
+
+model Tournament {
+  id                   String               @id @default(uuid()) @db.Uuid
+  organizationId       String               @map("organization_id") @db.Uuid
+  name                 String               @db.VarChar(180)
+  slug                 String               @db.VarChar(200)
+  description          String?
+  format               FootballFormat
+  visibility           TournamentVisibility @default(public)
+  status               TournamentStatus     @default(draft)
+  timezone             String               @default("America/Mexico_City")
+  registrationOpenAt   DateTime?             @map("registration_open_at") @db.Timestamptz
+  registrationCloseAt  DateTime?             @map("registration_close_at") @db.Timestamptz
+  startDate            DateTime?             @map("start_date") @db.Date
+  endDate              DateTime?             @map("end_date") @db.Date
+  pointsWin            Int                   @default(3) @map("points_win")
+  pointsDraw           Int                   @default(1) @map("points_draw")
+  pointsLoss           Int                   @default(0) @map("points_loss")
+  rules                Json                  @default("{}")
+  logoUrl              String?               @map("logo_url")
+  coverUrl             String?               @map("cover_url")
+  createdAt            DateTime              @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt            DateTime              @updatedAt @map("updated_at") @db.Timestamptz
+  organization         Organization          @relation(fields: [organizationId], references: [id])
+  members              TournamentMember[]
+  follows              TournamentFollow[]
+  entries              TournamentTeam[]
+  phases               Phase[]
+  matches              Match[]
+  news                 NewsPost[]
+
+  @@unique([organizationId, slug])
+  @@index([status, visibility, startDate])
+  @@index([organizationId, status])
+  @@map("tournaments")
+}
+
+model TournamentMember {
+  tournamentId String           @map("tournament_id") @db.Uuid
+  userId       String           @map("user_id") @db.Uuid
+  role         TournamentRole
+  status       MembershipStatus @default(active)
+  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  tournament   Tournament       @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([tournamentId, userId])
+  @@map("tournament_members")
+}
+
+model TournamentFollow {
+  tournamentId String     @map("tournament_id") @db.Uuid
+  userId       String     @map("user_id") @db.Uuid
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([tournamentId, userId])
+  @@map("tournament_follows")
+}
+
+model Team {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @db.VarChar(150)
+  slug        String   @unique @db.VarChar(180)
+  description String?
+  logoUrl     String?  @map("logo_url")
+  createdBy   String   @map("created_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  creator     User     @relation("TeamCreator", fields: [createdBy], references: [id])
+  entries     TournamentTeam[]
+
+  @@map("teams")
+}
+
+model Player {
+  id                String      @id @default(uuid()) @db.Uuid
+  displayName       String      @map("display_name") @db.VarChar(150)
+  dateOfBirth       DateTime?   @map("date_of_birth") @db.Date
+  photoUrl          String?     @map("photo_url")
+  preferredPosition String?     @map("preferred_position") @db.VarChar(40)
+  createdAt         DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime    @updatedAt @map("updated_at") @db.Timestamptz
+  rosters           TeamRoster[]
+
+  @@map("players")
+}
+
+model TournamentTeam {
+  id                 String      @id @default(uuid()) @db.Uuid
+  tournamentId       String      @map("tournament_id") @db.Uuid
+  teamId             String      @map("team_id") @db.Uuid
+  registrationStatus String      @default("pending") @map("registration_status") @db.VarChar(20)
+  requestedBy        String      @map("requested_by") @db.Uuid
+  registeredAt       DateTime    @default(now()) @map("registered_at") @db.Timestamptz
+  approvedAt         DateTime?   @map("approved_at") @db.Timestamptz
+  approvedBy         String?     @map("approved_by") @db.Uuid
+  tournament         Tournament @relation(fields: [tournamentId], references: [id])
+  team               Team       @relation(fields: [teamId], references: [id])
+  requester          User       @relation("RegistrationRequester", fields: [requestedBy], references: [id])
+  approver           User?      @relation("RegistrationApprover", fields: [approvedBy], references: [id])
+  roster             TeamRoster[]
+  homeMatches        Match[]    @relation("HomeEntry")
+  awayMatches        Match[]    @relation("AwayEntry")
+
+  @@unique([tournamentId, teamId])
+  @@unique([id, tournamentId])
+  @@map("tournament_teams")
+}
+
+model TeamRoster {
+  id                String         @id @default(uuid()) @db.Uuid
+  tournamentTeamId  String         @map("tournament_team_id") @db.Uuid
+  playerId          String         @map("player_id") @db.Uuid
+  jerseyNumber      Int?           @map("jersey_number") @db.SmallInt
+  position          String?        @db.VarChar(40)
+  status            String         @default("active") @db.VarChar(20)
+  validFrom         DateTime?      @map("valid_from") @db.Date
+  validUntil        DateTime?      @map("valid_until") @db.Date
+  tournamentTeam    TournamentTeam @relation(fields: [tournamentTeamId], references: [id])
+  player            Player         @relation(fields: [playerId], references: [id])
+
+  @@unique([tournamentTeamId, playerId])
+  @@map("team_rosters")
+}
+
+model Phase {
+  id             String     @id @default(uuid()) @db.Uuid
+  tournamentId   String     @map("tournament_id") @db.Uuid
+  name           String     @db.VarChar(120)
+  phaseType      PhaseType  @map("phase_type")
+  sequence       Int        @db.SmallInt
+  status         String     @default("pending") @db.VarChar(20)
+  startDate      DateTime?  @map("start_date") @db.Date
+  endDate        DateTime?  @map("end_date") @db.Date
+  rulesOverride  Json       @default("{}") @map("rules_override")
+  tournament     Tournament @relation(fields: [tournamentId], references: [id])
+  groups         CompetitionGroup[]
+  matchdays      Matchday[]
+  matches        Match[]
+
+  @@unique([tournamentId, sequence])
+  @@unique([id, tournamentId])
+  @@map("phases")
+}
+
+model CompetitionGroup {
+  id        String      @id @default(uuid()) @db.Uuid
+  phaseId   String      @map("phase_id") @db.Uuid
+  name      String      @db.VarChar(100)
+  sequence  Int         @db.SmallInt
+  phase     Phase       @relation(fields: [phaseId], references: [id])
+  matches   Match[]
+
+  @@unique([phaseId, name])
+  @@unique([id, phaseId])
+  @@map("competition_groups")
+}
+
+model Matchday {
+  id            String   @id @default(uuid()) @db.Uuid
+  phaseId       String   @map("phase_id") @db.Uuid
+  name          String   @db.VarChar(100)
+  sequence      Int      @db.SmallInt
+  scheduledDate DateTime? @map("scheduled_date") @db.Date
+  phase         Phase    @relation(fields: [phaseId], references: [id])
+  matches       Match[]
+
+  @@unique([phaseId, sequence])
+  @@map("matchdays")
+}
+
+model Venue {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String   @db.VarChar(150)
+  address        String?
+  latitude       Decimal? @db.Decimal(9, 6)
+  longitude      Decimal? @db.Decimal(9, 6)
+  timezone       String?
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@map("venues")
+}
+
+model Match {
+  id                    String      @id @default(uuid()) @db.Uuid
+  tournamentId          String      @map("tournament_id") @db.Uuid
+  phaseId               String      @map("phase_id") @db.Uuid
+  groupId               String?     @map("group_id") @db.Uuid
+  matchdayId            String?     @map("matchday_id") @db.Uuid
+  homeTournamentTeamId  String      @map("home_tournament_team_id") @db.Uuid
+  awayTournamentTeamId  String      @map("away_tournament_team_id") @db.Uuid
+  venueId               String?     @map("venue_id") @db.Uuid
+  scheduledAt           DateTime?   @map("scheduled_at") @db.Timestamptz
+  status                MatchStatus @default(scheduled)
+  homeScore             Int?        @map("home_score") @db.SmallInt
+  awayScore             Int?        @map("away_score") @db.SmallInt
+  homePenaltyScore      Int?        @map("home_penalty_score") @db.SmallInt
+  awayPenaltyScore      Int?        @map("away_penalty_score") @db.SmallInt
+  resultVersion         Int         @default(0) @map("result_version")
+  recordedBy            String?     @map("recorded_by") @db.Uuid
+  validatedBy           String?     @map("validated_by") @db.Uuid
+  validatedAt           DateTime?   @map("validated_at") @db.Timestamptz
+  createdAt             DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime    @updatedAt @map("updated_at") @db.Timestamptz
+  tournament            Tournament  @relation(fields: [tournamentId], references: [id])
+  phase                 Phase       @relation(fields: [phaseId, tournamentId], references: [id, tournamentId])
+  homeTeam              TournamentTeam @relation("HomeEntry", fields: [homeTournamentTeamId], references: [id])
+  awayTeam              TournamentTeam @relation("AwayEntry", fields: [awayTournamentTeamId], references: [id])
+  group                 CompetitionGroup? @relation(fields: [groupId], references: [id])
+  matchday              Matchday?   @relation(fields: [matchdayId], references: [id])
+  venue                 Venue?      @relation(fields: [venueId], references: [id])
+  recorder              User?       @relation("MatchRecorder", fields: [recordedBy], references: [id])
+  validator             User?       @relation("MatchValidator", fields: [validatedBy], references: [id])
+  events                MatchEvent[]
+
+  @@index([tournamentId, scheduledAt])
+  @@index([phaseId, matchdayId])
+  @@index([status, scheduledAt])
+  @@map("matches")
+}
+
+model MatchEvent {
+  id             String   @id @default(uuid()) @db.Uuid
+  matchId        String   @map("match_id") @db.Uuid
+  teamRosterId   String?  @map("team_roster_id") @db.Uuid
+  eventType      String   @map("event_type") @db.VarChar(30)
+  minute         Int?     @db.SmallInt
+  period         String   @default("regular") @db.VarChar(20)
+  status         String   @default("valid") @db.VarChar(20)
+  recordedBy     String   @map("recorded_by") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  match          Match    @relation(fields: [matchId], references: [id])
+
+  @@index([matchId, status])
+  @@map("match_events")
+}
+
+model NewsPost {
+  id           String     @id @default(uuid()) @db.Uuid
+  tournamentId String     @map("tournament_id") @db.Uuid
+  authorId     String     @map("author_id") @db.Uuid
+  title        String     @db.VarChar(200)
+  slug         String     @db.VarChar(220)
+  body         String
+  status       String     @default("draft") @db.VarChar(20)
+  publishedAt  DateTime?  @map("published_at") @db.Timestamptz
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz
+  tournament   Tournament @relation(fields: [tournamentId], references: [id])
+  author       User       @relation(fields: [authorId], references: [id])
+
+  @@unique([tournamentId, slug])
+  @@map("news_posts")
+}
+
+model Notification {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  type      String   @db.VarChar(80)
+  title     String   @db.VarChar(180)
+  body      String
+  data      Json     @default("{}")
+  readAt    DateTime? @map("read_at") @db.Timestamptz
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
