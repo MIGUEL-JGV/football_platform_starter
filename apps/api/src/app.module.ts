@@ -9,8 +9,10 @@ import { HealthModule } from './health/health.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { PlayersModule } from './players/players.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { ScheduleModule } from './schedule/schedule.module';
 import { TeamsModule } from './teams/teams.module';
 import { TournamentsModule } from './tournaments/tournaments.module';
+import { VenuesModule } from './venues/venues.module';
 
 @Module({
   imports: [
@@ -24,6 +26,8 @@ import { TournamentsModule } from './tournaments/tournaments.module';
     TournamentsModule,
     TeamsModule,
     PlayersModule,
+    VenuesModule,
+    ScheduleModule,
     HealthModule,
   ],
   providers: [

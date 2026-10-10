@@ -3,6 +3,7 @@ import { OrgTournamentsController } from './org-tournaments.controller';
 import { RegistrationsController } from './registrations.controller';
 import { RegistrationsService } from './registrations.service';
 import { RosterController } from './roster.controller';
+import { TournamentAccessService } from './tournament-access.service';
 import { TournamentsController } from './tournaments.controller';
 import { TournamentsService } from './tournaments.service';
 
@@ -13,7 +14,7 @@ import { TournamentsService } from './tournaments.service';
     RegistrationsController,
     RosterController,
   ],
-  providers: [TournamentsService, RegistrationsService],
-  exports: [TournamentsService, RegistrationsService],
+  providers: [TournamentsService, RegistrationsService, TournamentAccessService],
+  exports: [TournamentsService, RegistrationsService, TournamentAccessService],
 })
 export class TournamentsModule {}
