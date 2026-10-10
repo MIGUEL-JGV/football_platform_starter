@@ -6,6 +6,7 @@ import { AuthModule } from './auth/auth.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { HealthModule } from './health/health.module';
+import { NewsModule } from './news/news.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { PlayersModule } from './players/players.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -28,6 +29,7 @@ import { VenuesModule } from './venues/venues.module';
     PlayersModule,
     VenuesModule,
     ScheduleModule,
+    NewsModule,
     HealthModule,
   ],
   providers: [
