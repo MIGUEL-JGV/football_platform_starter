@@ -9,29 +9,51 @@ Base inicial de una plataforma multiorganización para torneos de fútbol.
 - Persistencia: PostgreSQL + Prisma
 - Monorepo: pnpm workspaces
 
-> Este starter contiene estructura, configuración inicial y modelo de datos base. No es una aplicación de producción completa: OAuth, permisos finos, endpoints de negocio, motor de calendario y pruebas deben implementarse antes del lanzamiento.
+## Estado actual (verificado)
+
+- ✅ Monorepo pnpm instalado (Node 24, pnpm 10). Scripts: `dev`, `lint`, `typecheck`.
+- ✅ PostgreSQL 16 en Docker (`infrastructure/docker/compose.yml`).
+- ✅ Esquema Prisma validado y migración inicial aplicada (20 tablas).
+- ✅ Relación inversa `Venue.matches` corregida.
+- ✅ Integridad de partidos: los FKs compuestos garantizan que `home`/`away` y `phase` pertenecen al mismo torneo que el `match`.
+- ✅ `GET /api/v1/health` comprueba la base de datos (`database: up|down`).
+- ⏳ Pendiente: autenticación (correo/Google/Apple), permisos por organización/torneo, CRUD de negocio, calendario, resultados/clasificaciones, noticias/notificaciones, pruebas y conexión web/móvil con la API.
 
 ## Requisitos
 - Node.js LTS compatible con las versiones elegidas
-- pnpm
+- pnpm 10 (instalable con `npm i -g pnpm@10` o `corepack enable`)
 - Docker Desktop (para PostgreSQL local)
 
 ## Inicio rápido
-1. Copia `.env.example` a `.env` y cambia los secretos.
-2. Inicia PostgreSQL:
+1. Copia `.env.example` a `.env` (en la raíz) y cambia los secretos.
    ```bash
-   docker compose -f infrastructure/docker/compose.yml up -d
+   cp .env.example .env
    ```
-3. Instala dependencias:
+2. Instala dependencias:
    ```bash
    pnpm install
    ```
-4. Desde `apps/api`, genera el cliente y aplica migraciones una vez completado el paquete:
+3. Inicia PostgreSQL:
    ```bash
-   pnpm prisma:generate
-   pnpm prisma:migrate
+   docker compose -f infrastructure/docker/compose.yml up -d
    ```
-5. Arranca los proyectos que ya estén implementados con sus scripts correspondientes.
+4. Genera el cliente Prisma y aplica migraciones (los comandos cargan el `.env` de la raíz):
+   ```bash
+   pnpm --filter @football/api prisma:generate
+   pnpm --filter @football/api prisma:migrate
+   ```
+5. Arranca la API y la web:
+   ```bash
+   pnpm dev
+   ```
+   - API: `http://localhost:4000/api/v1/health`
+   - Web: `http://localhost:3000`
+
+## Comandos útiles
+- `pnpm typecheck` — typecheck de api, web y mobile.
+- `pnpm lint` — ESLint (API y web).
+- `pnpm --filter @football/api prisma:validate` — valida el esquema.
+- `pnpm --filter @football/api prisma:studio` — Prisma Studio.
 
 ## Estructura
 - `apps/api`: backend NestJS.

@@ -317,6 +317,7 @@ model Venue {
   longitude      Decimal? @db.Decimal(9, 6)
   timezone       String?
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  matches        Match[]
 
   @@map("venues")
 }
@@ -344,8 +345,8 @@ model Match {
   updatedAt             DateTime    @updatedAt @map("updated_at") @db.Timestamptz
   tournament            Tournament  @relation(fields: [tournamentId], references: [id])
   phase                 Phase       @relation(fields: [phaseId, tournamentId], references: [id, tournamentId])
-  homeTeam              TournamentTeam @relation("HomeEntry", fields: [homeTournamentTeamId], references: [id])
-  awayTeam              TournamentTeam @relation("AwayEntry", fields: [awayTournamentTeamId], references: [id])
+  homeTeam              TournamentTeam @relation("HomeEntry", fields: [homeTournamentTeamId, tournamentId], references: [id, tournamentId])
+  awayTeam              TournamentTeam @relation("AwayEntry", fields: [awayTournamentTeamId, tournamentId], references: [id, tournamentId])
   group                 CompetitionGroup? @relation(fields: [groupId], references: [id])
   matchday              Matchday?   @relation(fields: [matchdayId], references: [id])
   venue                 Venue?      @relation(fields: [venueId], references: [id])
