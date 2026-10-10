@@ -26,6 +26,16 @@ export class TournamentAccessService {
     ]);
   }
 
+  async canRecord(tournamentId: string, organizationId: string, user: AuthUser): Promise<boolean> {
+    if (await this.canManage(tournamentId, organizationId, user)) {
+      return true;
+    }
+    const member = await this.prisma.tournamentMember.findUnique({
+      where: { tournamentId_userId: { tournamentId, userId: user.userId } },
+    });
+    return member?.status === MembershipStatus.active && member.role === TournamentRole.scorekeeper;
+  }
+
   async requireManager(tournamentId: string, user: AuthUser): Promise<Tournament> {
     const tournament = await this.requireTournament(tournamentId);
     const canManage = await this.canManage(tournament.id, tournament.organizationId, user);

@@ -1,9 +1,13 @@
 import {
   IsDateString,
   IsEnum,
+  IsInt,
   IsOptional,
   IsUUID,
+  Max,
+  Min,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { MatchStatus } from '@prisma/client';
 
 export class CreateMatchDto {
@@ -83,4 +87,37 @@ export class ListMatchesQueryDto {
   @IsOptional()
   @IsEnum(MatchStatus)
   status?: MatchStatus;
+}
+
+export class RecordResultDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(99)
+  homeScore!: number;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(99)
+  awayScore!: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(99)
+  homePenaltyScore?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(99)
+  awayPenaltyScore?: number;
+}
+
+export class StandingsQueryDto {
+  @IsUUID()
+  phaseId!: string;
 }

@@ -16,7 +16,7 @@ import { OptionalUser } from '../common/decorators/optional-user.decorator';
 import { AuthUser, CurrentUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { OptionalJwtAuthGuard } from '../common/guards/optional-jwt-auth.guard';
-import { CreateMatchDto, ListMatchesQueryDto, UpdateMatchDto } from './dto/match.dto';
+import { CreateMatchDto, ListMatchesQueryDto, RecordResultDto, UpdateMatchDto } from './dto/match.dto';
 import { MatchesService } from './matches.service';
 
 @Controller('tournaments/:id/matches')
@@ -62,6 +62,37 @@ export class MatchesController {
     @Body() dto: UpdateMatchDto,
   ) {
     return this.matches.update(id, matchId, user, dto);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post(':matchId/result')
+  recordResult(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('matchId', ParseUUIDPipe) matchId: string,
+    @CurrentUser() user: AuthUser,
+    @Body() dto: RecordResultDto,
+  ) {
+    return this.matches.recordResult(id, matchId, user, dto);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post(':matchId/result/validate')
+  validateResult(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('matchId', ParseUUIDPipe) matchId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.matches.validateResult(id, matchId, user);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post(':matchId/result/clear')
+  clearResult(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('matchId', ParseUUIDPipe) matchId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.matches.clearResult(id, matchId, user);
   }
 
   @HttpCode(HttpStatus.NO_CONTENT)

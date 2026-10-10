@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
@@ -8,7 +9,12 @@ import { AuthUser } from '../common/decorators/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { TournamentAccessService } from '../tournaments/tournament-access.service';
 import { VenuesService } from '../venues/venues.service';
-import { CreateMatchDto, ListMatchesQueryDto, UpdateMatchDto } from './dto/match.dto';
+import {
+  CreateMatchDto,
+  ListMatchesQueryDto,
+  RecordResultDto,
+  UpdateMatchDto,
+} from './dto/match.dto';
 
 @Injectable()
 export class MatchesService {
@@ -126,6 +132,69 @@ export class MatchesService {
     }
     await this.prisma.match.delete({ where: { id: match.id } });
     return { removed: true };
+  }
+
+  async recordResult(tournamentId: string, matchId: string, user: AuthUser, dto: RecordResultDto) {
+    const tournament = await this.access.requireTournament(tournamentId);
+    const canRecord = await this.access.canRecord(tournament.id, tournament.organizationId, user);
+    if (!canRecord) {
+      throw new ForbiddenException('Permisos insuficientes para registrar resultados.');
+    }
+    const match = await this.requireMatch(tournamentId, matchId);
+    const allowed: string[] = ['scheduled', 'postponed', 'in_progress', 'pending_validation'];
+    if (!allowed.includes(match.status)) {
+      throw new ConflictException('El partido no admite registro de resultado.');
+    }
+    return this.prisma.match.update({
+      where: { id: match.id },
+      data: {
+        homeScore: dto.homeScore,
+        awayScore: dto.awayScore,
+        homePenaltyScore: dto.homePenaltyScore ?? null,
+        awayPenaltyScore: dto.awayPenaltyScore ?? null,
+        status: 'pending_validation',
+        recordedBy: user.userId,
+        resultVersion: { increment: 1 },
+      },
+      include: this.matchInclude(),
+    });
+  }
+
+  async validateResult(tournamentId: string, matchId: string, user: AuthUser) {
+    await this.access.requireManager(tournamentId, user);
+    const match = await this.requireMatch(tournamentId, matchId);
+    if (match.status !== 'pending_validation') {
+      throw new ConflictException('Solo se pueden validar resultados pendientes.');
+    }
+    return this.prisma.match.update({
+      where: { id: match.id },
+      data: { status: 'finished', validatedBy: user.userId, validatedAt: new Date() },
+      include: this.matchInclude(),
+    });
+  }
+
+  async clearResult(tournamentId: string, matchId: string, user: AuthUser) {
+    await this.access.requireManager(tournamentId, user);
+    const match = await this.requireMatch(tournamentId, matchId);
+    const allowed: string[] = ['pending_validation', 'finished'];
+    if (!allowed.includes(match.status)) {
+      throw new ConflictException('El partido no tiene resultado que limpiar.');
+    }
+    return this.prisma.match.update({
+      where: { id: match.id },
+      data: {
+        homeScore: null,
+        awayScore: null,
+        homePenaltyScore: null,
+        awayPenaltyScore: null,
+        status: 'scheduled',
+        recordedBy: null,
+        validatedBy: null,
+        validatedAt: null,
+        resultVersion: { increment: 1 },
+      },
+      include: this.matchInclude(),
+    });
   }
 
   private matchInclude() {
