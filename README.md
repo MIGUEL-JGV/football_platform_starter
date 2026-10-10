@@ -17,7 +17,9 @@ Base inicial de una plataforma multiorganización para torneos de fútbol.
 - ✅ Relación inversa `Venue.matches` corregida.
 - ✅ Integridad de partidos: los FKs compuestos garantizan que `home`/`away` y `phase` pertenecen al mismo torneo que el `match`.
 - ✅ `GET /api/v1/health` comprueba la base de datos (`database: up|down`).
-- ⏳ Pendiente: autenticación (correo/Google/Apple), permisos por organización/torneo, CRUD de negocio, calendario, resultados/clasificaciones, noticias/notificaciones, pruebas y conexión web/móvil con la API.
+- ✅ Autenticación email/contraseña: registro, login y `GET /api/v1/auth/me` con JWT + bcrypt.
+- ✅ Guard global (rutas protegidas por defecto) con decorador `@Public()` para rutas abiertas.
+- ⏳ Pendiente: OAuth Google/Apple, permisos por organización/torneo, CRUD de negocio, calendario, resultados/clasificaciones, noticias/notificaciones, pruebas y conexión web/móvil con la API.
 
 ## Requisitos
 - Node.js LTS compatible con las versiones elegidas
@@ -53,6 +55,36 @@ Base inicial de una plataforma multiorganización para torneos de fútbol.
 - `pnpm typecheck` — typecheck de api, web y mobile.
 - `pnpm lint` — ESLint (API y web).
 - `pnpm --filter @football/api prisma:validate` — valida el esquema.
+
+## API de autenticación (`/api/v1/auth`)
+
+| Método | Ruta | Público | Descripción |
+|---|---|---|---|
+| POST | `/auth/register` | ✅ | Crea cuenta con email+contraseña. Devuelve `accessToken` y `user`. |
+| POST | `/auth/login` | ✅ | Inicia sesión. Devuelve `accessToken` y `user`. |
+| GET | `/auth/me` | ❌ | Datos del usuario autenticado (requiere `Authorization: Bearer <token>`). |
+
+- El guard JWT es **global**: todas las rutas requieren token salvo las marcadas con `@Public()`.
+- Contraseñas con bcrypt (coste 12). El correo se normaliza a minúsculas.
+- Errores: `409` correo duplicado, `401` credenciales inválidas, `400` validación de DTO.
+
+Ejemplo:
+```bash
+curl -X POST http://localhost:4000/api/v1/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"tu@correo.com","password":"contraseña-segura","displayName":"Tu Nombre"}'
+
+TOKEN=eyJhbGci...  # el accessToken devuelto arriba
+curl http://localhost:4000/api/v1/auth/me -H "Authorization: Bearer $TOKEN"
+```
+
+### Variables de entorno de JWT
+
+`JWT_ACCESS_SECRET` (obligatorio, secreto largo aleatorio) y `JWT_ACCESS_TTL` (por defecto `15m`).
+
+### Google y Apple (pendiente de configuración)
+
+Los modelos `AuthIdentity` ya soportan proveedores OAuth. La verificación de identidad de Google/Apple se implementará en una siguiente iteración; no hay credenciales configuradas todavía. No uses "inicio de sesión" social simulado en producción.
 - `pnpm --filter @football/api prisma:studio` — Prisma Studio.
 
 ## Estructura
