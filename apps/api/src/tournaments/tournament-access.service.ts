@@ -1,5 +1,11 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { MembershipStatus, OrganizationRole, Tournament, TournamentRole } from '@prisma/client';
+import {
+  MembershipStatus,
+  OrganizationRole,
+  Tournament,
+  TournamentRole,
+  TournamentVisibility,
+} from '@prisma/client';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { PrismaService } from './../prisma/prisma.service';
 
@@ -52,6 +58,17 @@ export class TournamentAccessService {
       throw new NotFoundException('Torneo no encontrado.');
     }
     return tournament;
+  }
+
+  async requireViewable(tournamentId: string, user: AuthUser | null): Promise<Tournament> {
+    const tournament = await this.requireTournament(tournamentId);
+    if (tournament.visibility === TournamentVisibility.public) {
+      return tournament;
+    }
+    if (user && (await this.canView(tournament.id, tournament.organizationId, user))) {
+      return tournament;
+    }
+    throw new NotFoundException('Torneo no encontrado.');
   }
 
   async requireOrgOwnerAdmin(organizationId: string, user: AuthUser): Promise<void> {
