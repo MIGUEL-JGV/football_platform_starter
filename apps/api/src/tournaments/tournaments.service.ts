@@ -122,6 +122,39 @@ export class TournamentsService {
     return { ...tournament, myRole, following };
   }
 
+  async myTournaments(user: AuthUser) {
+    const [follows, memberships] = await Promise.all([
+      this.prisma.tournamentFollow.findMany({
+        where: { userId: user.userId },
+        select: { tournamentId: true },
+      }),
+      this.prisma.tournamentMember.findMany({
+        where: { userId: user.userId, status: MembershipStatus.active },
+        select: { tournamentId: true, role: true },
+      }),
+    ]);
+    const followIds = new Set(follows.map((f) => f.tournamentId));
+    const membershipsById = new Map(memberships.map((m) => [m.tournamentId, m]));
+    const ids = Array.from(new Set([...followIds, ...membershipsById.keys()]));
+    if (ids.length === 0) {
+      return { items: [], total: 0 };
+    }
+    const tournaments = await this.prisma.tournament.findMany({
+      where: { id: { in: ids } },
+      include: {
+        organization: { select: { id: true, name: true, slug: true, logoUrl: true } },
+        _count: { select: { members: true, entries: true, follows: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    const items = tournaments.map((tournament) => ({
+      ...tournament,
+      following: followIds.has(tournament.id),
+      myRole: membershipsById.get(tournament.id)?.role,
+    }));
+    return { items, total: items.length };
+  }
+
   async update(organizationId: string, tournamentId: string, user: AuthUser, dto: UpdateTournamentDto) {
     const tournament = await this.prisma.tournament.findUnique({ where: { id: tournamentId } });
     if (!tournament || tournament.organizationId !== organizationId) {

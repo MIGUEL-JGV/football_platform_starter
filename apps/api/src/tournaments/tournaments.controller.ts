@@ -30,6 +30,11 @@ export class TournamentsController {
     return this.tournaments.listPublic(query);
   }
 
+  @Get('me/tournaments')
+  myTournaments(@CurrentUser() user: AuthUser) {
+    return this.tournaments.myTournaments(user);
+  }
+
   @Public()
   @UseGuards(OptionalJwtAuthGuard)
   @Get(':id')

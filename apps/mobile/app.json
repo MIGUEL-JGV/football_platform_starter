@@ -6,7 +6,12 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
-    "ios": { "supportsTablet": true },
-    "android": { "package": "com.example.footballplatform" }
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.example.footballplatform"
+    },
+    "android": {
+      "package": "com.example.footballplatform"
+    }
   }
 }

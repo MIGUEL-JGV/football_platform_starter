@@ -118,6 +118,7 @@ export class RecordResultDto {
 }
 
 export class StandingsQueryDto {
+  @IsOptional()
   @IsUUID()
-  phaseId!: string;
+  phaseId?: string;
 }

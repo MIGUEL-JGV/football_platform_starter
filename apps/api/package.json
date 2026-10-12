@@ -10,7 +10,11 @@
     "prisma:generate": "dotenv -e ../../.env -- prisma generate",
     "prisma:migrate": "dotenv -e ../../.env -- prisma migrate dev",
     "prisma:validate": "dotenv -e ../../.env -- prisma validate",
-    "prisma:studio": "dotenv -e ../../.env -- prisma studio"
+    "prisma:studio": "dotenv -e ../../.env -- prisma studio",
+    "prisma:seed": "dotenv -e ../../.env -- node prisma/seed.js"
+  },
+  "prisma": {
+    "seed": "dotenv -e ../../.env -- node prisma/seed.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",
