@@ -90,6 +90,13 @@ export class CreateTournamentDto {
   pointsLoss?: number;
 
   @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(2)
+  @Max(200)
+  maxTeams?: number;
+
+  @IsOptional()
   @IsObject()
   rules?: object;
 }
@@ -162,6 +169,13 @@ export class UpdateTournamentDto {
   @Min(0)
   @Max(100)
   pointsLoss?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(2)
+  @Max(200)
+  maxTeams?: number;
 
   @IsOptional()
   @IsObject()

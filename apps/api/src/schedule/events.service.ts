@@ -37,10 +37,14 @@ export class MatchEventsService {
     if (dto.teamRosterId) {
       await this.requireRosterInMatch(match, dto.teamRosterId);
     }
+    if (dto.secondaryTeamRosterId) {
+      await this.requireRosterInMatch(match, dto.secondaryTeamRosterId);
+    }
     const event = await this.prisma.matchEvent.create({
       data: {
         matchId: match.id,
         teamRosterId: dto.teamRosterId,
+        secondaryTeamRosterId: dto.secondaryTeamRosterId,
         eventType: dto.eventType,
         minute: dto.minute,
         period: dto.period ?? 'regular',
@@ -68,6 +72,9 @@ export class MatchEventsService {
     if (dto.teamRosterId) {
       await this.requireRosterInMatch(match, dto.teamRosterId);
     }
+    if (dto.secondaryTeamRosterId) {
+      await this.requireRosterInMatch(match, dto.secondaryTeamRosterId);
+    }
     const updated = await this.prisma.matchEvent.update({
       where: { id: event.id },
       data: {
@@ -76,6 +83,9 @@ export class MatchEventsService {
         ...(dto.period !== undefined && { period: dto.period }),
         ...(dto.status !== undefined && { status: dto.status }),
         ...(dto.teamRosterId !== undefined && { teamRosterId: dto.teamRosterId }),
+        ...(dto.secondaryTeamRosterId !== undefined && {
+          secondaryTeamRosterId: dto.secondaryTeamRosterId,
+        }),
       },
     });
     return (await this.enrich([updated]))[0];
@@ -93,11 +103,13 @@ export class MatchEventsService {
     return { removed: true };
   }
 
-  private async enrich<T extends { teamRosterId: string | null }>(events: T[]) {
+  private async enrich<
+    T extends { teamRosterId: string | null; secondaryTeamRosterId: string | null },
+  >(events: T[]) {
     const rosterIds = [
       ...new Set(
         events
-          .map((event) => event.teamRosterId)
+          .flatMap((event) => [event.teamRosterId, event.secondaryTeamRosterId])
           .filter((id): id is string => id !== null && id !== undefined),
       ),
     ];
@@ -116,10 +128,15 @@ export class MatchEventsService {
     const byId = new Map(rosters.map((roster) => [roster.id, roster]));
     return events.map((event) => {
       const roster = event.teamRosterId ? byId.get(event.teamRosterId) : undefined;
+      const secondary = event.secondaryTeamRosterId
+        ? byId.get(event.secondaryTeamRosterId)
+        : undefined;
       return {
         ...event,
         player: roster ? roster.player : null,
         jerseyNumber: roster ? roster.jerseyNumber : null,
+        secondaryPlayer: secondary ? secondary.player : null,
+        secondaryJerseyNumber: secondary ? secondary.jerseyNumber : null,
       };
     });
   }

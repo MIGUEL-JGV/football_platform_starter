@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import { listTournaments } from '../lib/api';
 import { formatDateRange, formatFootball, formatStatus } from '../lib/format';
 import type { PublicTournamentCard } from '@football/shared-types';
+import { Topbar } from '../components/Topbar';
 
 const emptyCatalog: PublicTournamentCard[] = [];
 
@@ -17,11 +18,7 @@ export default async function HomePage() {
 
   return (
     <main className="page">
-      <header className="topbar">
-        <Link className="brand" href="/">CANCHA<span>+</span></Link>
-        <nav><a href="#torneos">Explorar torneos</a><a href="#mis-torneos">Mis torneos</a></nav>
-        <Link className="login" href="/login">Iniciar sesión</Link>
-      </header>
+      <Topbar nav={<><a href="#torneos">Torneos para descubrir</a><a href="#mis-torneos">Mis torneos</a></>} />
       <section className="hero">
         <p className="eyebrow">TODO EL FÚTBOL, EN UN SOLO LUGAR</p>
         <h1>Encuentra tu próximo<br/><span>torneo.</span></h1>
@@ -57,7 +54,7 @@ export default async function HomePage() {
       </section>
       <section id="mis-torneos" className="personal">
         <div><p className="eyebrow">TU ESPACIO</p><h2>Todos tus torneos,<br/>en un solo lugar.</h2><p>Administra tus competiciones, consulta los torneos en los que participas y sigue tus favoritos.</p></div>
-        <Link className="light-button" href="/login">Entrar a mi espacio →</Link>
+        <Link className="light-button" href="/mis-torneos">Entrar a mi espacio →</Link>
       </section>
       <footer><Link className="brand" href="/">CANCHA<span>+</span></Link><p>Plataforma de torneos de fútbol · Prototipo inicial</p></footer>
     </main>

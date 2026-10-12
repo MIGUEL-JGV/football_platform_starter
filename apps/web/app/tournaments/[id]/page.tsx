@@ -8,6 +8,9 @@ import {
   getTournamentStandings,
   listTournamentMatches,
 } from '../../../lib/api';
+import { Topbar } from '../../../components/Topbar';
+import { FollowButton } from '../../../components/FollowButton';
+import { getSession } from '../../../lib/auth';
 
 type Params = Promise<{ id: string }>;
 
@@ -36,6 +39,7 @@ function formatDateTime(value: string | null): string {
 
 export default async function TournamentDetailPage({ params }: { params: Params }) {
   const { id } = await params;
+  const session = await getSession();
 
   let detail: TournamentDetail;
   let standings: StandingRow[] = [];
@@ -43,7 +47,7 @@ export default async function TournamentDetailPage({ params }: { params: Params 
 
   try {
     [detail, standings, matches] = await Promise.all([
-      getTournamentDetail(id),
+      getTournamentDetail(id, session?.token),
       getTournamentStandings(id).then((result) => result.items),
       listTournamentMatches(id),
     ]);
@@ -58,6 +62,7 @@ export default async function TournamentDetailPage({ params }: { params: Params 
       </main>
     );
   }
+  const following = session ? detail.following ?? false : false;
 
   const homeTeam = (match: Match) => match.homeTeam?.team?.name ?? 'Por definir';
   const awayTeam = (match: Match) => match.awayTeam?.team?.name ?? 'Por definir';
@@ -81,6 +86,7 @@ export default async function TournamentDetailPage({ params }: { params: Params 
         <p className="d-counts">
           {detail._count.entries} equipos participantes · {detail._count.follows} seguidores
         </p>
+        {session ? <FollowButton tournamentId={id} following={following} /> : null}
       </section>
 
       <section className="d-block">
@@ -145,15 +151,5 @@ export default async function TournamentDetailPage({ params }: { params: Params 
         )}
       </section>
     </main>
-  );
-}
-
-function Topbar() {
-  return (
-    <header className="topbar">
-      <Link className="brand" href="/">CANCHA<span>+</span></Link>
-      <nav><Link href="/">Inicio</Link><Link href="/tournaments">Torneos</Link></nav>
-      <Link className="login" href="/login">Iniciar sesión</Link>
-    </header>
   );
 }

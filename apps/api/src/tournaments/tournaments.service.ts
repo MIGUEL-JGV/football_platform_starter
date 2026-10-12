@@ -45,6 +45,7 @@ export class TournamentsService {
           pointsWin: dto.pointsWin,
           pointsDraw: dto.pointsDraw,
           pointsLoss: dto.pointsLoss,
+          maxTeams: dto.maxTeams,
           rules: dto.rules !== undefined ? (dto.rules as Prisma.InputJsonValue) : undefined,
           logoUrl: dto.logoUrl,
           coverUrl: dto.coverUrl,
@@ -112,6 +113,11 @@ export class TournamentsService {
       }
     }
     const myRole = user ? await this.myTournamentRole(tournament.id, user.userId) : undefined;
+    const myOrgRole = user ? await this.myOrgRole(tournament.organizationId, user.userId) : undefined;
+    const canManage =
+      myRole === TournamentRole.manager ||
+      myOrgRole === OrganizationRole.owner ||
+      myOrgRole === OrganizationRole.admin;
     const following = user
       ? Boolean(
           await this.prisma.tournamentFollow.findUnique({
@@ -119,11 +125,11 @@ export class TournamentsService {
           }),
         )
       : false;
-    return { ...tournament, myRole, following };
+    return { ...tournament, myRole, myOrgRole, canManage, following };
   }
 
   async myTournaments(user: AuthUser) {
-    const [follows, memberships] = await Promise.all([
+    const [follows, memberships, orgMemberships] = await Promise.all([
       this.prisma.tournamentFollow.findMany({
         where: { userId: user.userId },
         select: { tournamentId: true },
@@ -132,10 +138,24 @@ export class TournamentsService {
         where: { userId: user.userId, status: MembershipStatus.active },
         select: { tournamentId: true, role: true },
       }),
+      this.prisma.organizationMember.findMany({
+        where: { userId: user.userId, status: MembershipStatus.active },
+        select: { organizationId: true, role: true },
+      }),
     ]);
+    const orgRoleById = new Map(orgMemberships.map((m) => [m.organizationId, m.role]));
+    const orgTournaments =
+      orgRoleById.size > 0
+        ? await this.prisma.tournament.findMany({
+            where: { organizationId: { in: [...orgRoleById.keys()] } },
+            select: { id: true },
+          })
+        : [];
     const followIds = new Set(follows.map((f) => f.tournamentId));
     const membershipsById = new Map(memberships.map((m) => [m.tournamentId, m]));
-    const ids = Array.from(new Set([...followIds, ...membershipsById.keys()]));
+    const ids = Array.from(
+      new Set([...followIds, ...membershipsById.keys(), ...orgTournaments.map((t) => t.id)]),
+    );
     if (ids.length === 0) {
       return { items: [], total: 0 };
     }
@@ -147,11 +167,21 @@ export class TournamentsService {
       },
       orderBy: { createdAt: 'desc' },
     });
-    const items = tournaments.map((tournament) => ({
-      ...tournament,
-      following: followIds.has(tournament.id),
-      myRole: membershipsById.get(tournament.id)?.role,
-    }));
+    const managerOrgRoles: OrganizationRole[] = [OrganizationRole.owner, OrganizationRole.admin];
+    const items = tournaments.map((tournament) => {
+      const myRole = membershipsById.get(tournament.id)?.role;
+      const myOrgRole = orgRoleById.get(tournament.organizationId);
+      const canManage =
+        myRole === TournamentRole.manager ||
+        (myOrgRole !== undefined && managerOrgRoles.includes(myOrgRole));
+      return {
+        ...tournament,
+        following: followIds.has(tournament.id),
+        myRole,
+        myOrgRole,
+        canManage,
+      };
+    });
     return { items, total: items.length };
   }
 
@@ -185,6 +215,7 @@ export class TournamentsService {
         ...(dto.pointsWin !== undefined && { pointsWin: dto.pointsWin }),
         ...(dto.pointsDraw !== undefined && { pointsDraw: dto.pointsDraw }),
         ...(dto.pointsLoss !== undefined && { pointsLoss: dto.pointsLoss }),
+        ...(dto.maxTeams !== undefined && { maxTeams: dto.maxTeams }),
         ...(dto.rules !== undefined && { rules: dto.rules as Prisma.InputJsonValue }),
       },
     });
@@ -337,6 +368,16 @@ export class TournamentsService {
   private async myTournamentRole(tournamentId: string, userId: string): Promise<TournamentRole | undefined> {
     const member = await this.prisma.tournamentMember.findUnique({
       where: { tournamentId_userId: { tournamentId, userId } },
+    });
+    return member && member.status === MembershipStatus.active ? member.role : undefined;
+  }
+
+  private async myOrgRole(
+    organizationId: string,
+    userId: string,
+  ): Promise<OrganizationRole | undefined> {
+    const member = await this.prisma.organizationMember.findUnique({
+      where: { organizationId_userId: { organizationId, userId } },
     });
     return member && member.status === MembershipStatus.active ? member.role : undefined;
   }

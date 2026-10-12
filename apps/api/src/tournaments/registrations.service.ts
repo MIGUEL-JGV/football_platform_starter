@@ -77,10 +77,20 @@ export class RegistrationsService {
   }
 
   async approve(tournamentId: string, entryId: string, user: AuthUser) {
-    await this.requireManager(tournamentId, user);
+    const tournament = await this.requireManager(tournamentId, user);
     const entry = await this.requireEntry(entryId, tournamentId);
     if (entry.registrationStatus !== 'pending') {
       throw new ConflictException('Solo se pueden aprobar inscripciones pendientes.');
+    }
+    if (tournament.maxTeams != null) {
+      const approved = await this.prisma.tournamentTeam.count({
+        where: { tournamentId, registrationStatus: 'approved' },
+      });
+      if (approved >= tournament.maxTeams) {
+        throw new ConflictException(
+          `El torneo alcanzó el cupo máximo de ${tournament.maxTeams} equipos.`,
+        );
+      }
     }
     return this.prisma.tournamentTeam.update({
       where: { id: entry.id },
@@ -246,6 +256,7 @@ export class RegistrationsService {
     if (!canManage) {
       throw new ForbiddenException('Permisos insuficientes para este torneo.');
     }
+    return tournament;
   }
 
   private async requireTournament(tournamentId: string) {

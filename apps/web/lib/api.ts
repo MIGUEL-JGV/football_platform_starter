@@ -33,8 +33,15 @@ export interface TournamentDetail {
   logoUrl: string | null;
   coverUrl: string | null;
   organization: { id: string; name: string; slug: string };
+  pointsWin: number;
+  pointsDraw: number;
+  pointsLoss: number;
+  maxTeams: number | null;
   _count: { members: number; entries: number; follows: number };
   following: boolean;
+  myRole?: string;
+  myOrgRole?: string;
+  canManage?: boolean;
 }
 
 export interface StandingRow {
@@ -98,13 +105,50 @@ export async function listTournaments(
   };
 }
 
-async function request<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, { cache: 'no-store' });
+export async function request<T>(path: string, token?: string): Promise<T> {
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const response = await fetch(`${API_BASE_URL}${path}`, { cache: 'no-store', headers });
   if (response.status === 404) {
     throw new ApiNotFoundError();
   }
   if (!response.ok) {
     throw new Error(`La API respondió ${response.status}`);
+  }
+  return (await response.json()) as T;
+}
+
+export async function mutate<T>(
+  path: string,
+  options: { method?: 'POST' | 'PATCH' | 'DELETE'; body?: unknown; token?: string } = {},
+): Promise<T> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (options.token) headers.Authorization = `Bearer ${options.token}`;
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: options.method ?? 'POST',
+    headers,
+    body: options.body === undefined ? undefined : JSON.stringify(options.body),
+  });
+  if (response.status === 401) {
+    throw new Error('Tu sesión expiró. Vuelve a iniciar sesión.');
+  }
+  if (response.status === 404) {
+    throw new ApiNotFoundError();
+  }
+  if (!response.ok) {
+    let message = `La API respondió ${response.status}`;
+    try {
+      const data = (await response.json()) as { message?: string | string[] };
+      if (data?.message) {
+        message = Array.isArray(data.message) ? data.message[0] : data.message;
+      }
+    } catch {
+      // cuerpo de error no JSON
+    }
+    throw new Error(message);
+  }
+  if (response.status === 204) {
+    return undefined as T;
   }
   return (await response.json()) as T;
 }
@@ -116,8 +160,8 @@ export class ApiNotFoundError extends Error {
   }
 }
 
-export function getTournamentDetail(id: string): Promise<TournamentDetail> {
-  return request<TournamentDetail>(`/tournaments/${id}`);
+export function getTournamentDetail(id: string, token?: string): Promise<TournamentDetail> {
+  return request<TournamentDetail>(`/tournaments/${id}`, token);
 }
 
 export async function getTournamentStandings(
@@ -146,4 +190,63 @@ export async function listTournamentMatches(id: string): Promise<Match[]> {
     }
     throw error;
   }
+}
+
+export interface WebUser {
+  id: string;
+  email: string;
+  displayName: string;
+  status: string;
+}
+
+export interface AuthPayload {
+  accessToken: string;
+  user: WebUser;
+}
+
+export interface MyTournamentItem {
+  id: string;
+  name: string;
+  slug: string;
+  status: TournamentStatus;
+  format: FootballFormat;
+  visibility: string;
+  startDate: string | null;
+  endDate: string | null;
+  following: boolean;
+  myRole?: string;
+  myOrgRole?: string;
+  canManage?: boolean;
+  maxTeams?: number | null;
+  coverUrl?: string | null;
+  logoUrl?: string | null;
+  registrationOpenAt?: string | null;
+  registrationCloseAt?: string | null;
+  organization: { id: string; name: string; slug: string; logoUrl: string | null };
+  _count?: { entries: number; follows: number; members: number };
+}
+
+export function login(email: string, password: string): Promise<AuthPayload> {
+  return mutate<AuthPayload>('/auth/login', { body: { email, password } });
+}
+
+export function register(email: string, password: string, displayName: string): Promise<AuthPayload> {
+  return mutate<AuthPayload>('/auth/register', { body: { email, password, displayName } });
+}
+
+export function getMe(token: string): Promise<WebUser> {
+  return request<WebUser>('/auth/me', token);
+}
+
+export async function listMyTournaments(token: string): Promise<MyTournamentItem[]> {
+  const data = await request<{ items: MyTournamentItem[] }>('/tournaments/me/tournaments', token);
+  return data.items;
+}
+
+export async function followTournament(token: string, tournamentId: string): Promise<void> {
+  await mutate(`/tournaments/${tournamentId}/follow`, { method: 'POST', token });
+}
+
+export async function unfollowTournament(token: string, tournamentId: string): Promise<void> {
+  await mutate(`/tournaments/${tournamentId}/follow`, { method: 'DELETE', token });
 }

@@ -154,6 +154,7 @@ model Tournament {
   pointsWin            Int                   @default(3) @map("points_win")
   pointsDraw           Int                   @default(1) @map("points_draw")
   pointsLoss           Int                   @default(0) @map("points_loss")
+  maxTeams             Int?                  @map("max_teams") @db.SmallInt
   rules                Json                  @default("{}")
   logoUrl              String?               @map("logo_url")
   coverUrl             String?               @map("cover_url")
@@ -364,16 +365,17 @@ model Match {
 }
 
 model MatchEvent {
-  id             String   @id @default(uuid()) @db.Uuid
-  matchId        String   @map("match_id") @db.Uuid
-  teamRosterId   String?  @map("team_roster_id") @db.Uuid
-  eventType      String   @map("event_type") @db.VarChar(30)
-  minute         Int?     @db.SmallInt
-  period         String   @default("regular") @db.VarChar(20)
-  status         String   @default("valid") @db.VarChar(20)
-  recordedBy     String   @map("recorded_by") @db.Uuid
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
-  match          Match    @relation(fields: [matchId], references: [id])
+  id                    String   @id @default(uuid()) @db.Uuid
+  matchId               String   @map("match_id") @db.Uuid
+  teamRosterId          String?  @map("team_roster_id") @db.Uuid
+  secondaryTeamRosterId String?  @map("secondary_team_roster_id") @db.Uuid
+  eventType             String   @map("event_type") @db.VarChar(30)
+  minute                Int?     @db.SmallInt
+  period                String   @default("regular") @db.VarChar(20)
+  status                String   @default("valid") @db.VarChar(20)
+  recordedBy            String   @map("recorded_by") @db.Uuid
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz
+  match                 Match    @relation(fields: [matchId], references: [id])
 
   @@index([matchId, status])
   @@map("match_events")

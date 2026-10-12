@@ -19,7 +19,14 @@ Base inicial de una plataforma multiorganización para torneos de fútbol.
 - ✅ `GET /api/v1/health` comprueba la base de datos (`database: up|down`).
 - ✅ Autenticación email/contraseña: registro, login y `GET /api/v1/auth/me` con JWT + bcrypt.
 - ✅ Guard global (rutas protegidas por defecto) con decorador `@Public()` para rutas abiertas.
-- ⏳ Pendiente: OAuth Google/Apple, permisos por organización/torneo, CRUD de negocio, calendario, resultados/clasificaciones, noticias/notificaciones, pruebas y conexión web/móvil con la API.
+- ✅ Permisos por organización (`owner/admin/editor`) y torneo (`manager/scorekeeper/viewer`) con guardas y aislamiento entre organizaciones.
+- ✅ CRUD de negocio en API: organizaciones + miembros, torneos, equipos, jugadores, sedes, inscripciones (aprobar/rechazar/retirar) y plantillas.
+- ✅ Calendario en API: fases (liga/grupos/eliminatoria), jornadas, grupos, partidos con reprogramación.
+- ✅ Resultados y clasificación: registro → `pending_validation` → validación; tabla calculada de partidos validados con puntos configurables del torneo; eventos de partido (goles/tarjetas).
+- ✅ Noticias por torneo (publicar/despublicar).
+- ✅ Web conectada a la API: catálogo, búsqueda/filtros/paginación, detalle con tabla y calendario, login/registro reales (sesión en cookie HTTP-only), «Mis torneos» y botón «Seguir».
+- ✅ App móvil conectada a la API: autenticación, catálogo con búsqueda, detalle (tabla/calendario), seguir torneo, «Mis torneos» y perfil.
+- ⏳ Pendiente: OAuth Google/Apple, validación de cupos (`maxTeams`), generador automático de calendarios, notificaciones (API + UI), desempates configurables, pruebas automatizadas, Swagger y CI/CD.
 
 ## Requisitos
 - Node.js LTS compatible con las versiones elegidas

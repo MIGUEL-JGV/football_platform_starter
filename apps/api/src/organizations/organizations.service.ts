@@ -41,13 +41,17 @@ export class OrganizationsService {
   }
 
   async listForUser(user: AuthUser) {
-    return this.prisma.organization.findMany({
-      where: { members: { some: { userId: user.userId, status: MembershipStatus.active } } },
+    const memberships = await this.prisma.organizationMember.findMany({
+      where: { userId: user.userId, status: MembershipStatus.active },
       include: {
-        _count: { select: { members: true, tournaments: true } },
+        organization: { include: { _count: { select: { members: true, tournaments: true } } } },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { organization: { createdAt: 'desc' } },
     });
+    return memberships.map((membership) => ({
+      ...membership.organization,
+      myRole: membership.role,
+    }));
   }
 
   async get(id: string, user: AuthUser) {

@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import type { Paginated, PublicTournamentCard, TournamentStatus } from '@football/shared-types';
 import { listTournaments } from '../../lib/api';
 import { formatDateRange, formatFootball, formatStatus } from '../../lib/format';
+import { Topbar } from '../../components/Topbar';
 
 const STATUS_OPTIONS: { value: TournamentStatus; label: string }[] = [
   { value: 'registration', label: 'Inscripciones abiertas' },
@@ -44,11 +45,7 @@ export default async function TournamentsPage({ searchParams }: { searchParams: 
 
   return (
     <main className="page">
-      <header className="topbar">
-        <Link className="brand" href="/">CANCHA<span>+</span></Link>
-        <nav><Link href="/">Inicio</Link><Link href="/tournaments">Torneos</Link></nav>
-        <Link className="login" href="/login">Iniciar sesión</Link>
-      </header>
+      <Topbar />
 
       <section className="section">
         <div className="section-heading">

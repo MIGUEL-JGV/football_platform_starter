@@ -6,10 +6,15 @@ export const EVENT_TYPES = [
   'own_goal',
   'penalty_goal',
   'penalty_missed',
+  'penalty_conceded',
+  'penalty_saved',
   'yellow_card',
+  'second_yellow',
   'red_card',
   'substitution',
   'assist',
+  'foul',
+  'save',
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
@@ -41,6 +46,10 @@ export class CreateMatchEventDto {
   @IsOptional()
   @IsUUID()
   teamRosterId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  secondaryTeamRosterId?: string;
 }
 
 export class UpdateMatchEventDto {
@@ -66,4 +75,8 @@ export class UpdateMatchEventDto {
   @IsOptional()
   @IsUUID()
   teamRosterId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  secondaryTeamRosterId?: string;
 }
