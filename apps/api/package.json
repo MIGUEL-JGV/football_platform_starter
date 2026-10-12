@@ -5,13 +5,15 @@
   "scripts": {
     "dev": "nest start --watch",
     "build": "nest build",
-    "lint": "eslint \"src/**/*.ts\"",
+    "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\" \"vitest.config.ts\"",
     "typecheck": "tsc --noEmit",
     "prisma:generate": "dotenv -e ../../.env -- prisma generate",
     "prisma:migrate": "dotenv -e ../../.env -- prisma migrate dev",
     "prisma:validate": "dotenv -e ../../.env -- prisma validate",
     "prisma:studio": "dotenv -e ../../.env -- prisma studio",
-    "prisma:seed": "dotenv -e ../../.env -- node prisma/seed.js"
+    "prisma:seed": "dotenv -e ../../.env -- node prisma/seed.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "prisma": {
     "seed": "dotenv -e ../../.env -- node prisma/seed.js"
@@ -27,21 +29,28 @@
     "bcryptjs": "^3.0.3",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
+    "multer": "^1.4.5-lts.1",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
+    "qrcode": "^1.5.4",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "sharp": "^0.33.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
     "@nestjs/cli": "^11.0.0",
+    "@nestjs/testing": "^11.2.7",
+    "@types/multer": "^1.4.12",
     "@types/node": "^22.0.0",
     "@types/passport": "^1.0.17",
     "@types/passport-jwt": "^4.0.1",
+    "@types/qrcode": "^1.5.5",
     "dotenv-cli": "^8.0.0",
     "eslint": "^9.0.0",
     "prisma": "^6.0.0",
     "typescript": "^5.7.0",
-    "typescript-eslint": "^8.0.0"
+    "typescript-eslint": "^8.0.0",
+    "vitest": "^5.0.4"
   }
 }

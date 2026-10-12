@@ -38,6 +38,7 @@ export class StandingsService {
           homeScore: true,
           awayScore: true,
         },
+        orderBy: [{ scheduledAt: 'desc' }, { createdAt: 'desc' }],
       }),
       this.prisma.tournamentTeam.findMany({
         where: { tournamentId, registrationStatus: 'approved' },
@@ -60,6 +61,7 @@ export class StandingsService {
       points: 0,
     }));
     const table = new Map(rows.map((row) => [row.entryId, row]));
+    const forms = new Map<string, string[]>(rows.map((row) => [row.entryId, []]));
 
     for (const match of matches) {
       const home = table.get(match.homeTournamentTeamId);
@@ -69,6 +71,14 @@ export class StandingsService {
       }
       const homeScore = match.homeScore ?? 0;
       const awayScore = match.awayScore ?? 0;
+      const homeForm = forms.get(match.homeTournamentTeamId);
+      const awayForm = forms.get(match.awayTournamentTeamId);
+      if (homeForm && homeForm.length < 5) {
+        homeForm.push(homeScore > awayScore ? 'G' : homeScore < awayScore ? 'P' : 'E');
+      }
+      if (awayForm && awayForm.length < 5) {
+        awayForm.push(awayScore > homeScore ? 'G' : awayScore < homeScore ? 'P' : 'E');
+      }
       home.played += 1;
       away.played += 1;
       home.gf += homeScore;
@@ -94,7 +104,7 @@ export class StandingsService {
     }
 
     const items = rows
-      .map((row) => ({ ...row, gd: row.gf - row.ga }))
+      .map((row) => ({ ...row, gd: row.gf - row.ga, form: forms.get(row.entryId) ?? [] }))
       .sort(
         (a, b) =>
           b.points - a.points || b.gd - a.gd || b.gf - a.gf || a.name.localeCompare(b.name),

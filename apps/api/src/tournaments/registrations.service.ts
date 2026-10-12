@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -16,14 +17,33 @@ import { AuthUser } from '../common/decorators/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { ApplyEntryDto } from './dto/tournament-entry.dto';
 import { AddRosterPlayerDto, UpdateRosterPlayerDto } from './dto/tournament-roster.dto';
+import { InvitationsService } from './invitations.service';
+
+const CONSENT_SCOPE = 'registration';
+const ADULT_AGE = 18;
+
+function isMinor(dateOfBirth: Date, today = new Date()): boolean {
+  let age = today.getFullYear() - dateOfBirth.getFullYear();
+  const monthDiff = today.getMonth() - dateOfBirth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dateOfBirth.getDate())) {
+    age -= 1;
+  }
+  return age < ADULT_AGE;
+}
 
 @Injectable()
 export class RegistrationsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly invitations: InvitationsService,
+  ) {}
 
   async apply(tournamentId: string, user: AuthUser, dto: ApplyEntryDto) {
     const tournament = await this.requireTournament(tournamentId);
-    if (tournament.visibility !== TournamentVisibility.public) {
+    const invitation = dto.invitationToken
+      ? await this.invitations.requireUsable(dto.invitationToken, tournamentId)
+      : null;
+    if (!invitation && tournament.visibility !== TournamentVisibility.public) {
       throw new ForbiddenException('Solo se aceptan inscripciones en torneos públicos.');
     }
     const team = await this.prisma.team.findUnique({ where: { id: dto.teamId } });
@@ -39,27 +59,129 @@ export class RegistrationsService {
     if (existing && existing.registrationStatus !== 'rejected') {
       throw new ConflictException('El equipo ya está inscrito en este torneo.');
     }
-    if (existing) {
-      return this.prisma.tournamentTeam.update({
-        where: { tournamentId_teamId: { tournamentId, teamId: team.id } },
-        data: {
-          registrationStatus: 'pending',
-          approvedAt: null,
-          approvedBy: null,
-          registeredAt: new Date(),
-        },
-        include: this.entryInclude(),
-      });
+
+    const pendingRoster = dto.players && dto.players.length > 0 ? await this.validateRoster(team, dto) : [];
+
+    const entry = await this.prisma.$transaction(async (tx) => {
+      const created = existing
+        ? await tx.tournamentTeam.update({
+            where: { tournamentId_teamId: { tournamentId, teamId: team.id } },
+            data: {
+              registrationStatus: 'pending',
+              approvedAt: null,
+              approvedBy: null,
+              registeredAt: new Date(),
+              submittedAt: new Date(),
+              reviewNote: null,
+              reviewedAt: null,
+              reviewedBy: null,
+              representativeName: dto.representativeName,
+              representativeEmail: dto.representativeEmail,
+              representativePhone: dto.representativePhone,
+              ...(invitation && { invitationId: invitation.id }),
+            },
+            include: this.entryInclude(),
+          })
+        : await tx.tournamentTeam.create({
+            data: {
+              tournamentId,
+              teamId: team.id,
+              registrationStatus: 'pending',
+              requestedBy: user.userId,
+              submittedAt: new Date(),
+              representativeName: dto.representativeName,
+              representativeEmail: dto.representativeEmail,
+              representativePhone: dto.representativePhone,
+              ...(invitation && { invitationId: invitation.id }),
+            },
+            include: this.entryInclude(),
+          });
+      if (pendingRoster.length > 0) {
+        await tx.teamRoster.deleteMany({ where: { tournamentTeamId: created.id } });
+        await tx.consentRecord.deleteMany({
+          where: { tournamentTeamId: created.id },
+        });
+        const rosterData = pendingRoster.map((item) => ({
+          tournamentTeamId: created.id,
+          playerId: item.playerId,
+          jerseyNumber: item.jerseyNumber,
+          position: item.position,
+        }));
+        await tx.teamRoster.createMany({ data: rosterData });
+        const minorConsents = pendingRoster
+          .filter((item) => item.isMinor)
+          .map((item) => ({
+            tournamentTeamId: created.id,
+            playerId: item.playerId,
+            scope: CONSENT_SCOPE,
+            granted: true,
+            guardianName: item.consent!.guardianName,
+            guardianRelation: item.consent!.guardianRelation,
+            guardianDocument: item.consent!.guardianDocument,
+            effectiveAt: new Date(),
+          }));
+        if (minorConsents.length > 0) {
+          await tx.consentRecord.createMany({ data: minorConsents });
+        }
+      }
+      return created;
+    });
+
+    if (invitation) {
+      await this.invitations.consume(invitation.id);
     }
-    return this.prisma.tournamentTeam.create({
-      data: {
-        tournamentId,
-        teamId: team.id,
-        registrationStatus: 'pending',
-        requestedBy: user.userId,
-      },
+    return this.prisma.tournamentTeam.findUnique({
+      where: { id: entry.id },
       include: this.entryInclude(),
     });
+  }
+
+  private async validateRoster(team: { id: string; createdBy: string }, dto: ApplyEntryDto) {
+    const clubPlayerIds = new Set(
+      (
+        await this.prisma.player.findMany({
+          where: { createdBy: team.createdBy, id: { in: dto.players!.map((p) => p.playerId) } },
+          select: { id: true },
+        })
+      ).map((player) => player.id),
+    );
+    const players = await this.prisma.player.findMany({
+      where: { id: { in: dto.players!.map((p) => p.playerId) } },
+      select: { id: true, displayName: true, dateOfBirth: true },
+    });
+    if (players.length !== dto.players!.length || dto.players!.some((p) => !clubPlayerIds.has(p.playerId))) {
+      throw new BadRequestException('Todos los jugadores deben pertenecer al club del equipo.');
+    }
+    const seenNumbers = new Set<number>();
+    const seenPlayers = new Set<string>();
+    const norm = [];
+    for (const submitted of dto.players!) {
+      if (seenPlayers.has(submitted.playerId)) {
+        throw new ConflictException('Un jugador no se puede repetir en la plantilla.');
+      }
+      seenPlayers.add(submitted.playerId);
+      if (submitted.jerseyNumber != null) {
+        if (seenNumbers.has(submitted.jerseyNumber)) {
+          throw new ConflictException('No se puede repetir el número de dorsal.');
+        }
+        seenNumbers.add(submitted.jerseyNumber);
+      }
+      const player = players.find((p) => p.id === submitted.playerId)!;
+      const minor = player.dateOfBirth ? isMinor(player.dateOfBirth) : false;
+      if (minor && !submitted.consent?.guardianName) {
+        throw new BadRequestException(
+          `${player.displayName} es menor de edad: se requiere el consentimiento del tutor.`,
+        );
+      }
+      norm.push({
+        playerId: player.id,
+        jerseyNumber: submitted.jerseyNumber,
+        position: submitted.position,
+        isMinor: minor,
+        consent: submitted.consent,
+      });
+    }
+    return norm;
   }
 
   async listEntries(tournamentId: string, user: AuthUser) {
@@ -73,6 +195,24 @@ export class RegistrationsService {
       where,
       include: this.entryInclude(),
       orderBy: { registeredAt: 'desc' },
+    });
+  }
+
+  async getEntryDetail(tournamentId: string, entryId: string, user: AuthUser) {
+    const tournament = await this.requireTournament(tournamentId);
+    const canManage = await this.canManage(tournament.id, tournament.organizationId, user);
+    const entry = await this.requireEntry(entryId, tournamentId);
+    if (!canManage && entry.requestedBy !== user.userId) {
+      throw new ForbiddenException('Acceso denegado.');
+    }
+    return this.prisma.tournamentTeam.findUnique({
+      where: { id: entry.id },
+      include: {
+        team: { select: { id: true, name: true, slug: true, logoUrl: true } },
+        requester: { select: { id: true, displayName: true } },
+        invitation: { select: { id: true, label: true } },
+        _count: { select: { roster: true, consents: true, documents: true } },
+      },
     });
   }
 
@@ -94,12 +234,19 @@ export class RegistrationsService {
     }
     return this.prisma.tournamentTeam.update({
       where: { id: entry.id },
-      data: { registrationStatus: 'approved', approvedAt: new Date(), approvedBy: user.userId },
+      data: {
+        registrationStatus: 'approved',
+        approvedAt: new Date(),
+        approvedBy: user.userId,
+        reviewNote: null,
+        reviewedAt: new Date(),
+        reviewedBy: user.userId,
+      },
       include: this.entryInclude(),
     });
   }
 
-  async reject(tournamentId: string, entryId: string, user: AuthUser) {
+  async reject(tournamentId: string, entryId: string, user: AuthUser, reason?: string) {
     await this.requireManager(tournamentId, user);
     const entry = await this.requireEntry(entryId, tournamentId);
     if (entry.registrationStatus !== 'pending') {
@@ -107,7 +254,12 @@ export class RegistrationsService {
     }
     return this.prisma.tournamentTeam.update({
       where: { id: entry.id },
-      data: { registrationStatus: 'rejected' },
+      data: {
+        registrationStatus: 'rejected',
+        reviewNote: reason ?? null,
+        reviewedAt: new Date(),
+        reviewedBy: user.userId,
+      },
       include: this.entryInclude(),
     });
   }
@@ -145,11 +297,24 @@ export class RegistrationsService {
   async listRoster(tournamentId: string, entryId: string, user: AuthUser) {
     const { tournament, entry } = await this.requireEntryContext(tournamentId, entryId);
     await this.assertRosterAccess(tournament, entry, user);
-    return this.prisma.teamRoster.findMany({
+    const rosters = await this.prisma.teamRoster.findMany({
       where: { tournamentTeamId: entryId },
       include: { player: { select: this.rosterPlayerSelect } },
       orderBy: [{ jerseyNumber: 'asc' }, { player: { displayName: 'asc' } }],
     });
+    const [consents, minors] = await Promise.all([
+      this.prisma.consentRecord.findMany({
+        where: { tournamentTeamId: entryId },
+        select: { playerId: true, granted: true, guardianName: true, guardianRelation: true, scope: true },
+      }),
+      this.minorsOf(rosters.map((r) => r.playerId)),
+    ]);
+    const consentByPlayer = new Map(consents.map((c) => [c.playerId, c]));
+    return rosters.map((row) => ({
+      ...row,
+      isMinor: minors.get(row.playerId) ?? false,
+      consents: consentByPlayer.get(row.playerId) ? [consentByPlayer.get(row.playerId)!] : [],
+    }));
   }
 
   async addRosterPlayer(
@@ -222,6 +387,19 @@ export class RegistrationsService {
     return { removed: true };
   }
 
+  private async minorsOf(playerIds: string[]): Promise<Map<string, boolean>> {
+    if (playerIds.length === 0) {
+      return new Map();
+    }
+    const players = await this.prisma.player.findMany({
+      where: { id: { in: playerIds } },
+      select: { id: true, dateOfBirth: true },
+    });
+    return new Map(
+      players.map((player) => [player.id, player.dateOfBirth ? isMinor(player.dateOfBirth) : false]),
+    );
+  }
+
   private async requireEntryContext(tournamentId: string, entryId: string) {
     const tournament = await this.requireTournament(tournamentId);
     const entry = await this.requireEntry(entryId, tournamentId);
@@ -235,6 +413,13 @@ export class RegistrationsService {
   ): Promise<void> {
     const canManage = await this.canManage(tournament.id, tournament.organizationId, user);
     if (canManage || entry.requestedBy === user.userId) {
+      return;
+    }
+    const team = await this.prisma.team.findUnique({
+      where: { id: entry.teamId },
+      select: { createdBy: true },
+    });
+    if (team?.createdBy === user.userId) {
       return;
     }
     throw new ForbiddenException('Acceso denegado.');

@@ -41,6 +41,11 @@ export default async function PanelPage() {
             <p className="eyebrow">PANEL DE GESTIÓN</p>
             <h2>Administración</h2>
           </div>
+          {session ? (
+            <Link className="light-button" href="/panel/torneos/nuevo">
+              + Crear torneo
+            </Link>
+          ) : null}
         </div>
 
         {!session ? (

@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { AuthUser, CurrentUser } from '../common/decorators/current-user.decorator';
 import { TournamentRolesGuard } from '../common/guards/tournament-roles.guard';
-import { ApplyEntryDto } from './dto/tournament-entry.dto';
+import { ApplyEntryDto, RejectEntryDto } from './dto/tournament-entry.dto';
 import { RegistrationsService } from './registrations.service';
 
 @UseGuards(TournamentRolesGuard)
@@ -23,6 +23,15 @@ export class RegistrationsController {
   @Get()
   list(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: AuthUser) {
     return this.registrations.listEntries(id, user);
+  }
+
+  @Get(':entryId')
+  detail(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('entryId', ParseUUIDPipe) entryId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.registrations.getEntryDetail(id, entryId, user);
   }
 
   @Post()
@@ -50,8 +59,9 @@ export class RegistrationsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Param('entryId', ParseUUIDPipe) entryId: string,
     @CurrentUser() user: AuthUser,
+    @Body() dto: RejectEntryDto,
   ) {
-    return this.registrations.reject(id, entryId, user);
+    return this.registrations.reject(id, entryId, user, dto.reason);
   }
 
   @Delete(':entryId')

@@ -95,6 +95,144 @@ export class TeamsService {
     return team;
   }
 
+  async getPublicProfile(id: string) {
+    const team = await this.getById(id);
+    const entries = await this.prisma.tournamentTeam.findMany({
+      where: { teamId: id },
+      select: {
+        id: true,
+        registrationStatus: true,
+        tournament: { select: { id: true, name: true, slug: true, status: true } },
+      },
+      orderBy: { registeredAt: 'desc' },
+    });
+    const entryIds = entries.map((entry) => entry.id);
+    const [players, rosters] = await Promise.all([
+      this.prisma.player.findMany({
+        where: { createdBy: team.createdBy },
+        select: {
+          id: true,
+          displayName: true,
+          photoUrl: true,
+          preferredPosition: true,
+          dateOfBirth: true,
+        },
+        orderBy: { displayName: 'asc' },
+      }),
+      entryIds.length > 0
+        ? this.prisma.teamRoster.findMany({
+            where: { tournamentTeamId: { in: entryIds } },
+            select: {
+              id: true,
+              tournamentTeamId: true,
+              jerseyNumber: true,
+              position: true,
+              status: true,
+              player: {
+                select: {
+                  id: true,
+                  displayName: true,
+                  photoUrl: true,
+                  preferredPosition: true,
+                  dateOfBirth: true,
+                },
+              },
+            },
+            orderBy: [{ jerseyNumber: 'asc' }, { player: { displayName: 'asc' } }],
+          })
+        : [],
+    ]);
+
+    const age = (dateOfBirth: Date | null): number | null =>
+      dateOfBirth ? Math.floor((Date.now() - dateOfBirth.getTime()) / 31557600000) : null;
+
+    const squads = entries
+      .map((entry) => ({
+        entryId: entry.id,
+        registrationStatus: entry.registrationStatus,
+        tournament: entry.tournament,
+        players: rosters
+          .filter((roster) => roster.tournamentTeamId === entry.id)
+          .map((roster) => ({
+            rosterId: roster.id,
+            jerseyNumber: roster.jerseyNumber,
+            position: roster.position,
+            status: roster.status,
+            playerId: roster.player.id,
+            displayName: roster.player.displayName,
+            photoUrl: roster.player.photoUrl,
+            preferredPosition: roster.player.preferredPosition,
+            age: age(roster.player.dateOfBirth),
+          })),
+      }))
+      .filter((squad) => squad.players.length > 0);
+
+    const matches =
+      entryIds.length > 0
+        ? await this.prisma.match.findMany({
+            where: {
+              status: 'finished',
+              OR: [
+                { homeTournamentTeamId: { in: entryIds } },
+                { awayTournamentTeamId: { in: entryIds } },
+              ],
+            },
+            select: {
+              id: true,
+              homeScore: true,
+              awayScore: true,
+              scheduledAt: true,
+              tournament: { select: { id: true, name: true, slug: true } },
+              homeTeam: { select: { id: true, team: { select: { id: true, name: true } } } },
+              awayTeam: { select: { id: true, team: { select: { id: true, name: true } } } },
+            },
+            orderBy: [{ scheduledAt: 'desc' }, { createdAt: 'desc' }],
+            take: 8,
+          })
+        : [];
+
+    let played = 0;
+    let won = 0;
+    let drawn = 0;
+    let lost = 0;
+    let gf = 0;
+    let ga = 0;
+    for (const match of matches) {
+      const isHome = match.homeTeam?.team?.id === team.id;
+      const scored = (isHome ? match.homeScore : match.awayScore) ?? 0;
+      const conceded = (isHome ? match.awayScore : match.homeScore) ?? 0;
+      played += 1;
+      gf += scored;
+      ga += conceded;
+      if (scored > conceded) won += 1;
+      else if (scored < conceded) lost += 1;
+      else drawn += 1;
+    }
+
+    return {
+      team: {
+        id: team.id,
+        name: team.name,
+        slug: team.slug,
+        description: team.description,
+        logoUrl: team.logoUrl,
+        createdAt: team.createdAt,
+        creator: team.creator,
+      },
+      entries,
+      players: players.map((player) => ({
+        id: player.id,
+        displayName: player.displayName,
+        photoUrl: player.photoUrl,
+        preferredPosition: player.preferredPosition,
+        age: age(player.dateOfBirth),
+      })),
+      squads,
+      recentMatches: matches,
+      form: { played, won, drawn, lost, gf, ga, gd: gf - ga },
+    };
+  }
+
   async update(user: AuthUser, id: string, dto: UpdateTeamDto) {
     const team = await this.requireOwned(id, user.userId);
     return this.prisma.team.update({

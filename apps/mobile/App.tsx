@@ -9,6 +9,9 @@ import { AuthProvider } from './src/auth/AuthContext';
 import { RootStackParamList, TabParamList } from './src/navigation/types';
 import HomeScreen from './src/screens/HomeScreen';
 import TournamentDetailScreen from './src/screens/TournamentDetailScreen';
+import MatchDetailScreen from './src/screens/MatchDetailScreen';
+import TeamProfileScreen from './src/screens/TeamProfileScreen';
+import PlayerProfileScreen from './src/screens/PlayerProfileScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import MyTournamentsScreen from './src/screens/MyTournamentsScreen';
@@ -81,6 +84,21 @@ export default function App() {
               name="TournamentDetail"
               component={TournamentDetailScreen}
               options={{ title: 'Torneo' }}
+            />
+            <Stack.Screen
+              name="MatchDetail"
+              component={MatchDetailScreen}
+              options={{ title: 'Partido' }}
+            />
+            <Stack.Screen
+              name="TeamProfile"
+              component={TeamProfileScreen}
+              options={{ title: 'Equipo' }}
+            />
+            <Stack.Screen
+              name="PlayerProfile"
+              component={PlayerProfileScreen}
+              options={{ title: 'Jugador' }}
             />
             <Stack.Screen
               name="Login"

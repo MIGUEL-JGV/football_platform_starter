@@ -90,6 +90,11 @@ model User {
   validatedMatches Match[]             @relation("MatchValidator")
   newsPosts       NewsPost[]
   notifications   Notification[]
+  createdInvitations      TournamentInvitation[] @relation("InvitationCreator")
+  reviewedEntries         TournamentTeam[]       @relation("RegistrationReviewer")
+  uploadedPhotos          PlayerPhoto[]
+  uploadedDocuments       PlayerDocument[]
+  createdPlayerInvitations PlayerInvitation[]
 
   @@map("users")
 }
@@ -156,6 +161,12 @@ model Tournament {
   pointsLoss           Int                   @default(0) @map("points_loss")
   maxTeams             Int?                  @map("max_teams") @db.SmallInt
   rules                Json                  @default("{}")
+  competitionFormat    String?               @map("competition_format") @db.VarChar(30)
+  location             String?               @db.VarChar(180)
+  categoryLabel        String?               @map("category_label") @db.VarChar(80)
+  minAge               Int?                  @map("min_age") @db.SmallInt
+  maxAge               Int?                  @map("max_age") @db.SmallInt
+  registrationRequirements Json              @default("{}") @map("registration_requirements")
   logoUrl              String?               @map("logo_url")
   coverUrl             String?               @map("cover_url")
   createdAt            DateTime              @default(now()) @map("created_at") @db.Timestamptz
@@ -167,6 +178,7 @@ model Tournament {
   phases               Phase[]
   matches              Match[]
   news                 NewsPost[]
+  invitations          TournamentInvitation[]
 
   @@unique([organizationId, slug])
   @@index([status, visibility, startDate])
@@ -224,6 +236,10 @@ model Player {
   updatedAt         DateTime    @updatedAt @map("updated_at") @db.Timestamptz
   creator           User        @relation("PlayerCreator", fields: [createdBy], references: [id])
   rosters           TeamRoster[]
+  photos            PlayerPhoto[]
+  documents         PlayerDocument[]
+  consents          ConsentRecord[]
+  playerInvitations PlayerInvitation[]
 
   @@map("players")
 }
@@ -237,16 +253,32 @@ model TournamentTeam {
   registeredAt       DateTime    @default(now()) @map("registered_at") @db.Timestamptz
   approvedAt         DateTime?   @map("approved_at") @db.Timestamptz
   approvedBy         String?     @map("approved_by") @db.Uuid
+  invitationId       String?     @map("invitation_id") @db.Uuid
+  submittedAt        DateTime?   @map("submitted_at") @db.Timestamptz
+  reviewNote         String?     @map("review_note")
+  reviewedAt         DateTime?   @map("reviewed_at") @db.Timestamptz
+  reviewedBy         String?     @map("reviewed_by") @db.Uuid
+  representativeName  String?    @map("representative_name") @db.VarChar(150)
+  representativeEmail String?    @map("representative_email") @db.VarChar(320)
+  representativePhone String?    @map("representative_phone") @db.VarChar(40)
+  categoryLabel      String?     @map("category_label") @db.VarChar(80)
   tournament         Tournament @relation(fields: [tournamentId], references: [id])
   team               Team       @relation(fields: [teamId], references: [id])
   requester          User       @relation("RegistrationRequester", fields: [requestedBy], references: [id])
   approver           User?      @relation("RegistrationApprover", fields: [approvedBy], references: [id])
+  reviewer           User?      @relation("RegistrationReviewer", fields: [reviewedBy], references: [id])
+  invitation         TournamentInvitation? @relation(fields: [invitationId], references: [id])
   roster             TeamRoster[]
+  photos             PlayerPhoto[]
+  documents          PlayerDocument[]
+  consents           ConsentRecord[]
+  playerInvitations  PlayerInvitation[]
   homeMatches        Match[]    @relation("HomeEntry")
   awayMatches        Match[]    @relation("AwayEntry")
 
   @@unique([tournamentId, teamId])
   @@unique([id, tournamentId])
+  @@index([invitationId])
   @@map("tournament_teams")
 }
 
@@ -412,4 +444,124 @@ model Notification {
 
   @@index([userId, createdAt])
   @@map("notifications")
+}
+
+enum InvitationStatus {
+  active
+  revoked
+  exhausted
+}
+
+model TournamentInvitation {
+  id           String           @id @default(uuid()) @db.Uuid
+  tournamentId String           @map("tournament_id") @db.Uuid
+  tokenHash    String           @unique @map("token_hash") @db.VarChar(128)
+  label        String?          @db.VarChar(120)
+  maxUses      Int?             @map("max_uses") @db.SmallInt
+  usedCount    Int              @default(0) @map("used_count") @db.SmallInt
+  status       InvitationStatus @default(active)
+  expiresAt    DateTime?        @map("expires_at") @db.Timestamptz
+  revokedAt    DateTime?        @map("revoked_at") @db.Timestamptz
+  createdBy    String           @map("created_by") @db.Uuid
+  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz
+  tournament   Tournament       @relation(fields: [tournamentId], references: [id])
+  creator      User             @relation("InvitationCreator", fields: [createdBy], references: [id])
+  entries      TournamentTeam[]
+
+  @@index([tournamentId, status])
+  @@map("tournament_invitations")
+}
+
+model PlayerInvitation {
+  id               String         @id @default(uuid()) @db.Uuid
+  tournamentTeamId String         @map("tournament_team_id") @db.Uuid
+  playerId         String         @map("player_id") @db.Uuid
+  tokenHash        String         @unique @map("token_hash") @db.VarChar(128)
+  status           String         @default("active") @db.VarChar(20)
+  expiresAt        DateTime?      @map("expires_at") @db.Timestamptz
+  revokedAt        DateTime?      @map("revoked_at") @db.Timestamptz
+  usedAt           DateTime?      @map("used_at") @db.Timestamptz
+  createdBy        String         @map("created_by") @db.Uuid
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  tournamentTeam   TournamentTeam @relation(fields: [tournamentTeamId], references: [id])
+  player           Player         @relation(fields: [playerId], references: [id])
+  creator          User           @relation(fields: [createdBy], references: [id])
+
+  @@index([tournamentTeamId])
+  @@map("player_invitations")
+}
+
+model PlayerPhoto {
+  id               String         @id @default(uuid()) @db.Uuid
+  playerId         String         @map("player_id") @db.Uuid
+  tournamentTeamId String?        @map("tournament_team_id") @db.Uuid
+  storageKey       String         @map("storage_key")
+  thumbKey         String?        @map("thumb_key")
+  mimeType         String         @map("mime_type") @db.VarChar(60)
+  width            Int
+  height           Int
+  sizeBytes        Int            @map("size_bytes")
+  isPrimary        Boolean        @default(true) @map("is_primary")
+  uploadedBy       String         @map("uploaded_by") @db.Uuid
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  player           Player         @relation(fields: [playerId], references: [id])
+  tournamentTeam   TournamentTeam? @relation(fields: [tournamentTeamId], references: [id])
+  uploader         User           @relation(fields: [uploadedBy], references: [id])
+
+  @@index([playerId])
+  @@map("player_photos")
+}
+
+model PlayerDocument {
+  id               String         @id @default(uuid()) @db.Uuid
+  tournamentTeamId String         @map("tournament_team_id") @db.Uuid
+  playerId         String?        @map("player_id") @db.Uuid
+  docType          String         @map("doc_type") @db.VarChar(60)
+  storageKey       String         @map("storage_key")
+  mimeType         String         @map("mime_type") @db.VarChar(60)
+  sizeBytes        Int            @map("size_bytes")
+  status           String         @default("pending") @db.VarChar(20)
+  uploadedBy       String         @map("uploaded_by") @db.Uuid
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  tournamentTeam   TournamentTeam @relation(fields: [tournamentTeamId], references: [id])
+  player           Player?        @relation(fields: [playerId], references: [id])
+  uploader         User           @relation(fields: [uploadedBy], references: [id])
+
+  @@index([tournamentTeamId])
+  @@map("player_documents")
+}
+
+model ConsentRecord {
+  id               String         @id @default(uuid()) @db.Uuid
+  tournamentTeamId String         @map("tournament_team_id") @db.Uuid
+  playerId         String         @map("player_id") @db.Uuid
+  scope            String         @db.VarChar(40)
+  granted          Boolean        @default(false)
+  guardianName     String?        @map("guardian_name") @db.VarChar(150)
+  guardianRelation String?        @map("guardian_relation") @db.VarChar(60)
+  guardianDocument String?        @map("guardian_document") @db.VarChar(120)
+  grantedByUserId  String?        @map("granted_by_user_id") @db.Uuid
+  documentKey      String?        @map("document_key")
+  effectiveAt      DateTime?      @map("effective_at") @db.Timestamptz
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  tournamentTeam   TournamentTeam @relation(fields: [tournamentTeamId], references: [id])
+  player           Player         @relation(fields: [playerId], references: [id])
+
+  @@unique([playerId, tournamentTeamId, scope])
+  @@map("consent_records")
+}
+
+model AuditLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  actorId      String?  @map("actor_id") @db.Uuid
+  action       String   @db.VarChar(80)
+  entityType   String   @map("entity_type") @db.VarChar(60)
+  entityId     String?  @map("entity_id")
+  tournamentId String?  @map("tournament_id") @db.Uuid
+  metadata     Json     @default("{}")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([tournamentId, createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
 }

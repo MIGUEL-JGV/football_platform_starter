@@ -7,6 +7,7 @@ import {
   IsOptional,
   IsString,
   IsUrl,
+  IsUUID,
   Length,
   Max,
   MaxLength,
@@ -99,6 +100,43 @@ export class CreateTournamentDto {
   @IsOptional()
   @IsObject()
   rules?: object;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  competitionFormat?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(180)
+  location?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  categoryLabel?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(120)
+  minAge?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(120)
+  maxAge?: number;
+
+  @IsOptional()
+  @IsObject()
+  registrationRequirements?: object;
+
+  @IsOptional()
+  @IsUUID()
+  organizationId?: string;
 }
 
 export class UpdateTournamentDto {
@@ -180,4 +218,37 @@ export class UpdateTournamentDto {
   @IsOptional()
   @IsObject()
   rules?: object;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(30)
+  competitionFormat?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(180)
+  location?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  categoryLabel?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(120)
+  minAge?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  @Max(120)
+  maxAge?: number;
+
+  @IsOptional()
+  @IsObject()
+  registrationRequirements?: object;
 }

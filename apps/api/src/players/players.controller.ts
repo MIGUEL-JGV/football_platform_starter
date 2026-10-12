@@ -12,6 +12,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { AuthUser, CurrentUser } from '../common/decorators/current-user.decorator';
+import { Public } from '../common/decorators/public.decorator';
 import { CreatePlayerDto, ListPlayersQueryDto, UpdatePlayerDto } from './dto/player.dto';
 import { PlayersService } from './players.service';
 
@@ -27,6 +28,12 @@ export class PlayersController {
   @Post()
   create(@CurrentUser() user: AuthUser, @Body() dto: CreatePlayerDto) {
     return this.players.create(user, dto);
+  }
+
+  @Public()
+  @Get(':id/profile')
+  profile(@Param('id', ParseUUIDPipe) id: string) {
+    return this.players.getPublicProfile(id);
   }
 
   @Get(':id')

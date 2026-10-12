@@ -2,19 +2,27 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Topbar } from '../../../../components/Topbar';
 import { EntryRow } from '../../../../components/EntryActions';
-import { PhaseManager } from '../../../../components/PhaseManager';
+import { InvitationManager } from '../../../../components/InvitationManager';
 import { MatchManager } from '../../../../components/MatchManager';
+import { NewsManager } from '../../../../components/NewsManager';
+import { PhaseManager } from '../../../../components/PhaseManager';
 import { getSession } from '../../../../lib/auth';
 import { getTournamentDetail } from '../../../../lib/api';
 import {
   listEntries,
+  listEntryRoster,
+  listInvitations,
   listManageMatches,
+  listManageNews,
   listMatchdays,
   listPhases,
   type ManageMatch,
+  type ManageNewsPost,
   type Matchday,
   type Phase,
+  type RosterPlayer,
   type TournamentEntry,
+  type TournamentInvitation,
 } from '../../../../lib/manage';
 import { formatFootball, formatStatus } from '../../../../lib/format';
 
@@ -28,8 +36,10 @@ export default async function ManageTournamentPage({ params }: { params: Params 
   }
 
   let entries: TournamentEntry[] = [];
+  let invitations: TournamentInvitation[] = [];
   let phases: Phase[] = [];
   let matches: ManageMatch[] = [];
+  let news: ManageNewsPost[] = [];
   const matchdaysByPhase: Record<string, Matchday[]> = {};
   let detail: Awaited<ReturnType<typeof getTournamentDetail>>;
   try {
@@ -45,6 +55,24 @@ export default async function ManageTournamentPage({ params }: { params: Params 
   } catch {
     entries = [];
   }
+  const rostersByEntry: Record<string, RosterPlayer[]> = {};
+  if (entries.length > 0) {
+    await Promise.all(
+      entries.map(async (entry) => {
+        try {
+          rostersByEntry[entry.id] = await listEntryRoster(session.token, id, entry.id);
+        } catch {
+          rostersByEntry[entry.id] = [];
+        }
+      }),
+    );
+  }
+  const rostersByTeam = rostersByEntry;
+  try {
+    invitations = await listInvitations(session.token, id);
+  } catch {
+    invitations = [];
+  }
   try {
     phases = await listPhases(session.token, id);
     for (const phase of phases) {
@@ -57,6 +85,11 @@ export default async function ManageTournamentPage({ params }: { params: Params 
     matches = await listManageMatches(session.token, id);
   } catch {
     matches = [];
+  }
+  try {
+    news = (await listManageNews(session.token, id)).items;
+  } catch {
+    news = [];
   }
 
   const pending = entries.filter((e) => e.registrationStatus === 'pending');
@@ -96,17 +129,24 @@ export default async function ManageTournamentPage({ params }: { params: Params 
             groups
               .filter(([, list]) => list.length > 0)
               .map(([label, list]) => (
-                <div className="entry-group" key={label}>
-                  <p className="entry-group-title">{label} · {list.length}</p>
-                  <ul className="entry-list">
-                    {list.map((entry) => (
-                      <EntryRow key={entry.id} tournamentId={id} entry={entry} />
-                    ))}
-                  </ul>
-                </div>
+<div className="entry-group" key={label}>
+                    <p className="entry-group-title">{label} · {list.length}</p>
+                    <ul className="entry-list">
+                      {list.map((entry) => (
+                        <EntryRow
+                          key={entry.id}
+                          tournamentId={id}
+                          entry={entry}
+                          roster={rostersByEntry[entry.id] ?? []}
+                        />
+                      ))}
+                    </ul>
+                  </div>
               ))
           )}
         </div>
+
+        <InvitationManager tournamentId={id} invitations={invitations} />
 
         <PhaseManager
           tournamentId={id}
@@ -120,7 +160,10 @@ export default async function ManageTournamentPage({ params }: { params: Params 
           phases={phases}
           matchdaysByPhase={matchdaysByPhase}
           approvedEntries={approved}
+          rostersByTeam={rostersByTeam}
         />
+
+        <NewsManager tournamentId={id} posts={news} />
       </section>
     </main>
   );

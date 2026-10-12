@@ -14,8 +14,10 @@ import {
   type MatchStatus,
   type Matchday,
   type Phase,
+  type RosterPlayer,
   type TournamentEntry,
 } from '../lib/manage';
+import { MatchEventEditor } from './MatchEventEditor';
 
 const RECORDABLE: MatchStatus[] = ['scheduled', 'postponed', 'in_progress', 'pending_validation'];
 
@@ -29,10 +31,21 @@ function formatDateTime(value: string | null): string {
   }).format(new Date(value));
 }
 
-function MatchRow({ tournamentId, match }: { tournamentId: string; match: ManageMatch }) {
+function MatchRow({
+  tournamentId,
+  match,
+  homeRoster,
+  awayRoster,
+}: {
+  tournamentId: string;
+  match: ManageMatch;
+  homeRoster: RosterPlayer[];
+  awayRoster: RosterPlayer[];
+}) {
   const router = useRouter();
   const [home, setHome] = useState(String(match.homeScore ?? ''));
   const [away, setAway] = useState(String(match.awayScore ?? ''));
+  const [showEvents, setShowEvents] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -49,6 +62,7 @@ function MatchRow({ tournamentId, match }: { tournamentId: string; match: Manage
   }
 
   const recordable = RECORDABLE.includes(match.status);
+  const eventEditor = match._count?.events > 0 || showEvents;
 
   return (
     <li className="match-row">
@@ -127,7 +141,24 @@ function MatchRow({ tournamentId, match }: { tournamentId: string; match: Manage
             Limpiar
           </button>
         ) : null}
+        <button
+          className="btn-sm btn-ghost"
+          disabled={pending}
+          onClick={() => setShowEvents((value) => !value)}
+        >
+          {showEvents ? 'Ocultar eventos' : `Eventos (${match._count?.events ?? 0})`}
+        </button>
       </div>
+      {eventEditor ? (
+        <div className="match-events">
+          <MatchEventEditor
+            tournamentId={tournamentId}
+            matchId={match.id}
+            homeRoster={homeRoster}
+            awayRoster={awayRoster}
+          />
+        </div>
+      ) : null}
     </li>
   );
 }
@@ -138,12 +169,14 @@ export function MatchManager({
   phases,
   matchdaysByPhase,
   approvedEntries,
+  rostersByTeam,
 }: {
   tournamentId: string;
   matches: ManageMatch[];
   phases: Phase[];
   matchdaysByPhase: Record<string, Matchday[]>;
   approvedEntries: TournamentEntry[];
+  rostersByTeam: Record<string, RosterPlayer[]>;
 }) {
   const router = useRouter();
   const [phaseId, setPhaseId] = useState(phases[0]?.id ?? '');
@@ -155,6 +188,7 @@ export function MatchManager({
   const [pending, startTransition] = useTransition();
 
   const matchdays = phaseId ? (matchdaysByPhase[phaseId] ?? []) : [];
+  const pendingResults = matches.filter((match) => match.status === 'pending_validation').length;
 
   function submit() {
     setError(null);
@@ -195,6 +229,11 @@ export function MatchManager({
         <h3>Partidos y resultados</h3>
         <span className="result-count">{matches.length}</span>
       </div>
+      {pendingResults > 0 ? (
+        <p className="panel-note">
+          {pendingResults} {pendingResults === 1 ? 'resultado pendiente de validación' : 'resultados pendientes de validación'}.
+        </p>
+      ) : null}
 
       {phases.length === 0 ? (
         <p className="empty">Crea una fase y al menos 2 inscripciones aprobadas para programar partidos.</p>
@@ -270,7 +309,13 @@ export function MatchManager({
       ) : (
         <ul className="match-list">
           {matches.map((match) => (
-            <MatchRow key={match.id} tournamentId={tournamentId} match={match} />
+            <MatchRow
+              key={match.id}
+              tournamentId={tournamentId}
+              match={match}
+              homeRoster={rostersByTeam[match.homeTeam.id] ?? []}
+              awayRoster={rostersByTeam[match.awayTeam.id] ?? []}
+            />
           ))}
         </ul>
       )}

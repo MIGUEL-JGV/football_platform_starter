@@ -42,6 +42,12 @@ export class TeamsController {
     return this.teams.getById(id);
   }
 
+  @Public()
+  @Get(':id/profile')
+  profile(@Param('id', ParseUUIDPipe) id: string) {
+    return this.teams.getPublicProfile(id);
+  }
+
   @Patch(':id')
   update(
     @CurrentUser() user: AuthUser,

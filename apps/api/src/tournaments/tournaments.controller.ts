@@ -17,6 +17,7 @@ import { OptionalJwtAuthGuard } from '../common/guards/optional-jwt-auth.guard';
 import { TournamentRolesGuard } from '../common/guards/tournament-roles.guard';
 import { AddTournamentMemberDto, UpdateTournamentMemberDto } from './dto/tournament-member.dto';
 import { ListTournamentsQueryDto } from './dto/list-tournaments.dto';
+import { CreateTournamentDto } from './dto/tournament.dto';
 import { TournamentsService } from './tournaments.service';
 
 @UseGuards(TournamentRolesGuard)
@@ -33,6 +34,11 @@ export class TournamentsController {
   @Get('me/tournaments')
   myTournaments(@CurrentUser() user: AuthUser) {
     return this.tournaments.myTournaments(user);
+  }
+
+  @Post()
+  create(@CurrentUser() user: AuthUser, @Body() dto: CreateTournamentDto) {
+    return this.tournaments.createForUser(user, dto);
   }
 
   @Public()

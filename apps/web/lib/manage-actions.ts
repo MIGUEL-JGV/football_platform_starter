@@ -3,16 +3,41 @@
 import { revalidatePath } from 'next/cache';
 import { getToken } from './auth';
 import {
+  applyEntry,
   approveEntry,
   clearMatchResult,
+  createInvitation,
   createMatch,
   createMatchday,
+  createMatchEvent,
+  createNews,
   createPhase,
+  createTournament,
+  deleteMatchEvent,
+  deleteNews,
+  deletePlayerPhoto,
+  listMatchEvents,
+  publishNews,
   recordMatchResult,
+  regenerateInvitation,
   rejectEntry,
+  revokeInvitation,
+  setPrimaryPlayerPhoto,
+  unpublishNews,
+  updateMatchEvent,
+  updateNews,
+  uploadPlayerPhoto,
   validateMatchResult,
   withdrawEntry,
+  type AppliedEntry,
+  type CreateTournamentInput,
+  type CreatedInvitation,
+  type ManagedMatchEvent,
+  type ManageNewsPost,
+  type MatchEventInput,
+  type NewsStatus,
   type PhaseType,
+  type PlayerPhoto,
   type TournamentEntry,
 } from './manage';
 
@@ -52,8 +77,11 @@ export async function approveEntryAction(
 export async function rejectEntryAction(
   tournamentId: string,
   entryId: string,
+  reason?: string,
 ): Promise<EntryActionResult> {
-  return runEntryAction(tournamentId, entryId, rejectEntry);
+  return runEntryAction(tournamentId, entryId, (token, tid, eid) =>
+    rejectEntry(token, tid, eid, reason),
+  );
 }
 
 export async function withdrawEntryAction(
@@ -182,5 +210,356 @@ export async function clearResultAction(
     return { ok: true };
   } catch (error) {
     return { ok: false, error: error instanceof Error ? error.message : 'No se pudo limpiar el resultado.' };
+  }
+}
+
+export interface MatchEventsResult {
+  ok: boolean;
+  error?: string;
+  events?: ManagedMatchEvent[];
+}
+
+export async function listMatchEventsAction(
+  tournamentId: string,
+  matchId: string,
+): Promise<MatchEventsResult> {
+  const token = await getToken();
+  if (!token) return { ok: false, error: 'auth' };
+  try {
+    const events = await listMatchEvents(token, tournamentId, matchId);
+    return { ok: true, events };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'No se pudieron cargar los eventos.',
+    };
+  }
+}
+
+export async function createMatchEventAction(
+  tournamentId: string,
+  matchId: string,
+  dto: MatchEventInput,
+): Promise<MatchEventsResult> {
+  const token = await getToken();
+  if (!token) return { ok: false, error: 'auth' };
+  try {
+    await createMatchEvent(token, tournamentId, matchId, dto);
+    revalidateSchedule(tournamentId);
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'No se pudo registrar el evento.',
+    };
+  }
+}
+
+export async function updateMatchEventAction(
+  tournamentId: string,
+  matchId: string,
+  eventId: string,
+  dto: MatchEventInput,
+): Promise<MatchEventsResult> {
+  const token = await getToken();
+  if (!token) return { ok: false, error: 'auth' };
+  try {
+    await updateMatchEvent(token, tournamentId, matchId, eventId, dto);
+    revalidateSchedule(tournamentId);
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'No se pudo modificar el evento.',
+    };
+  }
+}
+
+export async function deleteMatchEventAction(
+  tournamentId: string,
+  matchId: string,
+  eventId: string,
+): Promise<SimpleResult> {
+  const token = await getToken();
+  if (!token) return { ok: false, error: 'auth' };
+  try {
+    await deleteMatchEvent(token, tournamentId, matchId, eventId);
+    revalidateSchedule(tournamentId);
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'No se pudo eliminar el evento.',
+    };
+  }
+}
+
+export interface NewsActionResult {
+  ok: boolean;
+  error?: string;
+  post?: ManageNewsPost;
+}
+
+function revalidateNews(tournamentId: string) {
+  revalidateSchedule(tournamentId);
+  revalidatePath(`/tournaments/${tournamentId}/news`);
+}
+
+export async function createNewsAction(
+  tournamentId: string,
+  dto: { title: string; body: string; status?: NewsStatus },
+): Promise<NewsActionResult> {
+  const token = await getToken();
+  if (!token) return { ok: false, error: 'auth' };
+  try {
+    const post = await createNews(token, tournamentId, dto);
+    revalidateNews(tournamentId);
+    return { ok: true, post };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'No se pudo crear la noticia.',
+    };
+  }
+}
+
+export async function updateNewsAction(
+  tournamentId: string,
+  postId: string,
+  dto: { title?: string; body?: string; status?: NewsStatus },
+): Promise<NewsActionResult> {
+  const token = await getToken();
+  if (!token) return { ok: false, error: 'auth' };
+  try {
+    const post = await updateNews(token, tournamentId, postId, dto);
+    revalidateNews(tournamentId);
+    return { ok: true, post };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'No se pudo guardar la noticia.',
+    };
+  }
+}
+
+export async function deleteNewsAction(tournamentId: string, postId: string): Promise<SimpleResult> {
+  const token = await getToken();
+  if (!token) return { ok: false, error: 'auth' };
+  try {
+    await deleteNews(token, tournamentId, postId);
+    revalidateNews(tournamentId);
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'No se pudo eliminar la noticia.',
+    };
+  }
+}
+
+export async function publishNewsAction(tournamentId: string, postId: string): Promise<NewsActionResult> {
+  const token = await getToken();
+  if (!token) return { ok: false, error: 'auth' };
+  try {
+    const post = await publishNews(token, tournamentId, postId);
+    revalidateNews(tournamentId);
+    return { ok: true, post };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'No se pudo publicar la noticia.',
+    };
+  }
+}
+
+export async function unpublishNewsAction(tournamentId: string, postId: string): Promise<NewsActionResult> {
+  const token = await getToken();
+  if (!token) return { ok: false, error: 'auth' };
+  try {
+    const post = await unpublishNews(token, tournamentId, postId);
+    revalidateNews(tournamentId);
+    return { ok: true, post };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'No se pudo despublicar la noticia.',
+    };
+  }
+}
+
+export interface ApplyEntryResult {
+  ok: boolean;
+  error?: string;
+  entry?: AppliedEntry;
+}
+
+export async function applyEntryAction(
+  tournamentId: string,
+  dto: {
+    teamId: string;
+    invitationToken?: string;
+    representativeName?: string;
+    representativePhone?: string;
+    representativeEmail?: string;
+    players?: import('./manage').ApplyPlayerInput[];
+  },
+): Promise<ApplyEntryResult> {
+  const token = await getToken();
+  if (!token) return { ok: false, error: 'auth' };
+  try {
+    const entry = await applyEntry(token, tournamentId, dto);
+    revalidatePath(`/tournaments/${tournamentId}`);
+    revalidatePath('/panel');
+    return { ok: true, entry };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'No se pudo enviar la inscripción.',
+    };
+  }
+}
+
+export interface CreateTournamentResult {
+  ok: boolean;
+  error?: string;
+  id?: string;
+}
+
+export async function createTournamentAction(
+  dto: CreateTournamentInput,
+): Promise<CreateTournamentResult> {
+  const token = await getToken();
+  if (!token) return { ok: false, error: 'auth' };
+  try {
+    const tournament = await createTournament(token, dto);
+    revalidatePath('/panel');
+    revalidatePath('/mis-torneos');
+    return { ok: true, id: tournament.id };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'No se pudo crear el torneo.',
+    };
+  }
+}
+
+export interface InvitationActionResult {
+  ok: boolean;
+  error?: string;
+  invitation?: CreatedInvitation;
+}
+
+export async function createInvitationAction(
+  tournamentId: string,
+  dto: { label?: string; maxUses?: number; expiresInDays?: number },
+): Promise<InvitationActionResult> {
+  const token = await getToken();
+  if (!token) return { ok: false, error: 'auth' };
+  try {
+    const invitation = await createInvitation(token, tournamentId, dto);
+    revalidatePath(`/panel/tournaments/${tournamentId}`);
+    return { ok: true, invitation };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'No se pudo crear la invitación.',
+    };
+  }
+}
+
+export async function regenerateInvitationAction(
+  tournamentId: string,
+  invitationId: string,
+): Promise<InvitationActionResult> {
+  const token = await getToken();
+  if (!token) return { ok: false, error: 'auth' };
+  try {
+    const invitation = await regenerateInvitation(token, tournamentId, invitationId);
+    revalidatePath(`/panel/tournaments/${tournamentId}`);
+    return { ok: true, invitation };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'No se pudo regenerar la invitación.',
+    };
+  }
+}
+
+export async function revokeInvitationAction(
+  tournamentId: string,
+  invitationId: string,
+): Promise<SimpleResult> {
+  const token = await getToken();
+  if (!token) return { ok: false, error: 'auth' };
+  try {
+    await revokeInvitation(token, tournamentId, invitationId);
+    revalidatePath(`/panel/tournaments/${tournamentId}`);
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'No se pudo revocar la invitación.',
+    };
+  }
+}
+
+export interface PhotoActionResult {
+  ok: boolean;
+  error?: string;
+  photo?: PlayerPhoto;
+}
+
+export async function uploadPhotoAction(
+  playerId: string,
+  formData: FormData,
+): Promise<PhotoActionResult> {
+  const token = await getToken();
+  if (!token) return { ok: false, error: 'auth' };
+  const file = formData.get('file');
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, error: 'Selecciona una imagen para subir.' };
+  }
+  try {
+    const photo = await uploadPlayerPhoto(token, playerId, file);
+    revalidatePath(`/players/${playerId}`);
+    return { ok: true, photo };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'No se pudo subir la fotografía.',
+    };
+  }
+}
+
+export async function setPrimaryPhotoAction(
+  playerId: string,
+  photoId: string,
+): Promise<PhotoActionResult> {
+  const token = await getToken();
+  if (!token) return { ok: false, error: 'auth' };
+  try {
+    const photo = await setPrimaryPlayerPhoto(token, playerId, photoId);
+    revalidatePath(`/players/${playerId}`);
+    return { ok: true, photo };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'No se pudo actualizar la portada.',
+    };
+  }
+}
+
+export async function deletePhotoAction(playerId: string, photoId: string): Promise<SimpleResult> {
+  const token = await getToken();
+  if (!token) return { ok: false, error: 'auth' };
+  try {
+    await deletePlayerPhoto(token, playerId, photoId);
+    revalidatePath(`/players/${playerId}`);
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'No se pudo eliminar la fotografía.',
+    };
   }
 }

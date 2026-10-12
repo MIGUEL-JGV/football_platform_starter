@@ -9,11 +9,19 @@ import { PhasesController } from './phases.controller';
 import { PhasesService } from './phases.service';
 import { StandingsController } from './standings.controller';
 import { StandingsService } from './standings.service';
+import { StatsController } from './stats.controller';
+import { StatsService } from './stats.service';
 
 @Module({
   imports: [TournamentsModule, VenuesModule],
-  controllers: [PhasesController, MatchesController, MatchEventsController, StandingsController],
-  providers: [PhasesService, MatchesService, MatchEventsService, StandingsService],
-  exports: [PhasesService, MatchesService, MatchEventsService, StandingsService],
+  controllers: [
+    PhasesController,
+    MatchesController,
+    MatchEventsController,
+    StandingsController,
+    StatsController,
+  ],
+  providers: [PhasesService, MatchesService, MatchEventsService, StandingsService, StatsService],
+  exports: [PhasesService, MatchesService, MatchEventsService, StandingsService, StatsService],
 })
 export class ScheduleModule {}

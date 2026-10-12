@@ -67,6 +67,167 @@ export interface StandingRow {
   ga: number;
   gd: number;
   points: number;
+  form?: string[];
+}
+
+export interface StatsPlayerRow {
+  rank: number;
+  playerId: string;
+  playerName: string;
+  jerseyNumber: number | null;
+  entryId: string;
+  teamId: string;
+  teamName: string;
+  goals: number;
+  penaltyGoals: number;
+  ownGoals: number;
+  assists: number;
+  yellow: number;
+  secondYellow: number;
+  red: number;
+  foulsCommitted: number;
+  foulsReceived: number;
+  saves: number;
+}
+
+export interface StatsTeamRow {
+  entryId: string;
+  teamId: string;
+  name: string;
+  slug: string;
+  logoUrl: string | null;
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  gf: number;
+  ga: number;
+  gd: number;
+  points: number;
+  cleanSheets: number;
+  foulsCommitted: number;
+  foulsReceived: number;
+  yellow: number;
+  red: number;
+}
+
+export interface TournamentStats {
+  phaseId: string | null;
+  phaseName: string | null;
+  counts: {
+    matchesTotal: number;
+    matchesPlayed: number;
+    matchesPending: number;
+    goalsTotal: number;
+    avgGoalsPerMatch: number | null;
+    homeWins: number;
+    draws: number;
+    awayWins: number;
+  };
+  scorers: StatsPlayerRow[];
+  assists: StatsPlayerRow[];
+  discipline: StatsPlayerRow[];
+  teams: StatsTeamRow[];
+}
+
+export interface MatchEvent {
+  id: string;
+  matchId: string;
+  eventType: string;
+  minute: number | null;
+  period: string;
+  status: string;
+  player: { id: string; displayName: string; preferredPosition: string | null } | null;
+  jerseyNumber: number | null;
+  secondaryPlayer: { id: string; displayName: string; preferredPosition: string | null } | null;
+  secondaryJerseyNumber: number | null;
+}
+
+export interface TeamProfile {
+  team: {
+    id: string;
+    name: string;
+    slug: string;
+    description: string | null;
+    logoUrl: string | null;
+    createdAt: string;
+    creator: { id: string; displayName: string };
+  };
+  entries: {
+    id: string;
+    registrationStatus: string;
+    tournament: { id: string; name: string; slug: string; status: string };
+  }[];
+  players: {
+    id: string;
+    displayName: string;
+    photoUrl: string | null;
+    preferredPosition: string | null;
+    age: number | null;
+  }[];
+  squads: {
+    entryId: string;
+    registrationStatus: string;
+    tournament: { id: string; name: string; slug: string; status: string };
+    players: {
+      rosterId: string;
+      jerseyNumber: number | null;
+      position: string | null;
+      status: string;
+      playerId: string;
+      displayName: string;
+      photoUrl: string | null;
+      preferredPosition: string | null;
+      age: number | null;
+    }[];
+  }[];
+  recentMatches: {
+    id: string;
+    homeScore: number | null;
+    awayScore: number | null;
+    scheduledAt: string | null;
+    tournament: { id: string; name: string; slug: string };
+    homeTeam: { id: string; team: { id: string; name: string } } | null;
+    awayTeam: { id: string; team: { id: string; name: string } } | null;
+  }[];
+  form: { played: number; won: number; drawn: number; lost: number; gf: number; ga: number; gd: number };
+}
+
+export interface PlayerProfile {
+  player: {
+    id: string;
+    displayName: string;
+    dateOfBirth: string | null;
+    photoUrl: string | null;
+    preferredPosition: string | null;
+    createdAt: string;
+  };
+  teams: {
+    rosterId: string;
+    jerseyNumber: number | null;
+    position: string | null;
+    team: { id: string; name: string; slug: string; logoUrl: string | null };
+    tournament: { id: string; name: string; slug: string };
+  }[];
+  stats: {
+    goals: number;
+    penaltyGoals: number;
+    ownGoals: number;
+    assists: number;
+    yellow: number;
+    secondYellow: number;
+    red: number;
+    foulsCommitted: number;
+    foulsReceived: number;
+    saves: number;
+  };
+  recentEvents: {
+    eventType: string;
+    minute: number | null;
+    teamRosterId: string | null;
+    secondaryTeamRosterId: string | null;
+    match: { id: string; scheduledAt: string | null; tournament: { id: string; name: string; slug: string } };
+  }[];
 }
 
 export interface StandingsResponse {
@@ -128,6 +289,26 @@ export function getStandings(id: string, phaseId?: string): Promise<StandingsRes
 
 export function listMatches(id: string): Promise<Match[]> {
   return apiRequest<Match[]>(`/tournaments/${id}/matches`);
+}
+
+export function getTournamentStats(id: string, phaseId?: string): Promise<TournamentStats> {
+  return apiRequest<TournamentStats>(`/tournaments/${id}/stats${buildQuery({ phaseId })}`);
+}
+
+export function getMatch(id: string, matchId: string): Promise<Match> {
+  return apiRequest<Match>(`/tournaments/${id}/matches/${matchId}`);
+}
+
+export function listMatchEvents(id: string, matchId: string): Promise<MatchEvent[]> {
+  return apiRequest<MatchEvent[]>(`/tournaments/${id}/matches/${matchId}/events`);
+}
+
+export function getTeamProfile(id: string): Promise<TeamProfile> {
+  return apiRequest<TeamProfile>(`/teams/${id}/profile`);
+}
+
+export function getPlayerProfile(id: string): Promise<PlayerProfile> {
+  return apiRequest<PlayerProfile>(`/players/${id}/profile`);
 }
 
 export function myTournaments(token: string): Promise<MyTournamentsResponse> {

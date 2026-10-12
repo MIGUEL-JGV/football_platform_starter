@@ -38,3 +38,34 @@ export function formatDate(value: string | null | undefined): string {
   if (Number.isNaN(date.getTime())) return '—';
   return date.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', year: 'numeric' });
 }
+
+export const EVENT_LABELS: Record<string, string> = {
+  goal: 'Gol',
+  own_goal: 'Autogol',
+  penalty_goal: 'Gol de penal',
+  penalty_missed: 'Penal fallado',
+  penalty_conceded: 'Penal concedido',
+  penalty_saved: 'Penal atajado',
+  yellow_card: 'Tarjeta amarilla',
+  second_yellow: 'Segunda amarilla',
+  red_card: 'Tarjeta roja',
+  substitution: 'Cambio',
+  assist: 'Asistencia',
+  foul: 'Falta',
+  save: 'Atajada',
+};
+
+export const formatEvent = (eventType: string): string => EVENT_LABELS[eventType] ?? eventType;
+
+export function formatDateTime(value: string | null | undefined): string {
+  if (!value) return 'Por definir';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Por definir';
+  return date.toLocaleString('es-MX', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}

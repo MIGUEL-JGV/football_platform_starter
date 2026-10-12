@@ -47,6 +47,15 @@ export class TournamentsService {
           pointsLoss: dto.pointsLoss,
           maxTeams: dto.maxTeams,
           rules: dto.rules !== undefined ? (dto.rules as Prisma.InputJsonValue) : undefined,
+          competitionFormat: dto.competitionFormat,
+          location: dto.location,
+          categoryLabel: dto.categoryLabel,
+          minAge: dto.minAge,
+          maxAge: dto.maxAge,
+          registrationRequirements:
+            dto.registrationRequirements !== undefined
+              ? (dto.registrationRequirements as Prisma.InputJsonValue)
+              : undefined,
           logoUrl: dto.logoUrl,
           coverUrl: dto.coverUrl,
         },
@@ -61,6 +70,51 @@ export class TournamentsService {
       });
       return { ...tournament, organization };
     });
+  }
+
+  async createForUser(user: AuthUser, dto: CreateTournamentDto) {
+    const organizationId = dto.organizationId
+      ? (await this.requireOrgRole(dto.organizationId, user, [
+          OrganizationRole.owner,
+          OrganizationRole.admin,
+        ]),
+        dto.organizationId)
+      : await this.getOrCreatePersonalOrganization(user);
+    return this.create(organizationId, user, dto);
+  }
+
+  private async getOrCreatePersonalOrganization(user: AuthUser): Promise<string> {
+    const slug = `personal-${user.userId}`;
+    const existing = await this.prisma.organization.findUnique({ where: { slug } });
+    if (existing) {
+      return existing.id;
+    }
+    const handle = user.email.split('@')[0] || 'organizador';
+    try {
+      const organization = await this.prisma.organization.create({
+        data: { name: `Organización de ${handle}`, slug, createdBy: user.userId },
+      });
+      await this.prisma.organizationMember.create({
+        data: {
+          organizationId: organization.id,
+          userId: user.userId,
+          role: OrganizationRole.owner,
+          status: MembershipStatus.active,
+        },
+      });
+      return organization.id;
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        const raced = await this.prisma.organization.findUnique({ where: { slug } });
+        if (raced) {
+          return raced.id;
+        }
+      }
+      throw error;
+    }
   }
 
   async listPublic(query: ListTournamentsQueryDto) {
@@ -217,6 +271,14 @@ export class TournamentsService {
         ...(dto.pointsLoss !== undefined && { pointsLoss: dto.pointsLoss }),
         ...(dto.maxTeams !== undefined && { maxTeams: dto.maxTeams }),
         ...(dto.rules !== undefined && { rules: dto.rules as Prisma.InputJsonValue }),
+        ...(dto.competitionFormat !== undefined && { competitionFormat: dto.competitionFormat }),
+        ...(dto.location !== undefined && { location: dto.location }),
+        ...(dto.categoryLabel !== undefined && { categoryLabel: dto.categoryLabel }),
+        ...(dto.minAge !== undefined && { minAge: dto.minAge }),
+        ...(dto.maxAge !== undefined && { maxAge: dto.maxAge }),
+        ...(dto.registrationRequirements !== undefined && {
+          registrationRequirements: dto.registrationRequirements as Prisma.InputJsonValue,
+        }),
       },
     });
   }
