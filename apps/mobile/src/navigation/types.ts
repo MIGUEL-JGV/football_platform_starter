@@ -7,6 +7,7 @@ export type RootStackParamList = {
   Login: undefined;
   Register: undefined;
   CreateTournament: undefined;
+  ApplyEntry: { tournamentId: string; tournamentName: string; requiresInvitation: boolean };
 };
 
 export type TabParamList = {

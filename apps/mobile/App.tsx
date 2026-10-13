@@ -17,6 +17,7 @@ import RegisterScreen from './src/screens/RegisterScreen';
 import MyTournamentsScreen from './src/screens/MyTournamentsScreen';
 import AccountScreen from './src/screens/AccountScreen';
 import CreateTournamentScreen from './src/screens/CreateTournamentScreen';
+import ApplyEntryScreen from './src/screens/ApplyEntryScreen';
 import { colors } from './src/theme';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -95,6 +96,11 @@ export default function App() {
               name="CreateTournament"
               component={CreateTournamentScreen}
               options={{ title: 'Crear torneo' }}
+            />
+            <Stack.Screen
+              name="ApplyEntry"
+              component={ApplyEntryScreen}
+              options={{ title: 'Inscribir equipo' }}
             />
             <Stack.Screen
               name="TeamProfile"

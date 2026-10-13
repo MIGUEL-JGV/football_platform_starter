@@ -26,6 +26,7 @@ import {
   TeamBalance,
 } from '../components/StatCharts';
 import { TournamentManagement } from '../components/TournamentManagement';
+import { TournamentInvitations } from '../components/TournamentInvitations';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TournamentDetail'>;
 
@@ -174,6 +175,20 @@ export default function TournamentDetailScreen({ route, navigation }: Props) {
   }
 
   const segments = detail.canManage ? [...SEGMENTS, MANAGEMENT_SEGMENT] : SEGMENTS;
+
+  const canApply = detail.status === 'draft' || detail.status === 'registration';
+
+  const openApply = () => {
+    if (!token) {
+      navigation.navigate('Login');
+      return;
+    }
+    navigation.navigate('ApplyEntry', {
+      tournamentId,
+      tournamentName: detail.name,
+      requiresInvitation: detail.visibility !== 'public',
+    });
+  };
 
   const openMatch = (match: Match) =>
     navigation.navigate('MatchDetail', { tournamentId, matchId: match.id });
@@ -493,6 +508,14 @@ export default function TournamentDetailScreen({ route, navigation }: Props) {
             </Text>
           )}
         </Pressable>
+        {canApply ? (
+          <Pressable
+            onPress={openApply}
+            style={({ pressed }) => [styles.applyButton, pressed && styles.followPressed]}
+          >
+            <Text style={styles.applyText}>Inscribir equipo</Text>
+          </Pressable>
+        ) : null}
       </View>
 
       <ScrollView
@@ -520,13 +543,16 @@ export default function TournamentDetailScreen({ route, navigation }: Props) {
       {segment === 'resultados' ? renderResults() : null}
       {segment === 'estadisticas' ? renderStats() : null}
       {segment === 'gestion' ? (
-        <TournamentManagement
-          tournamentId={detail.id}
-          organizationId={detail.organization.id}
-          status={detail.status}
-          canCreateAuthorization={detail.myOrgRole === 'owner'}
-          onChanged={() => load('refresh')}
-        />
+        <>
+          <TournamentManagement
+            tournamentId={detail.id}
+            organizationId={detail.organization.id}
+            status={detail.status}
+            canCreateAuthorization={detail.myOrgRole === 'owner'}
+            onChanged={() => load('refresh')}
+          />
+          <TournamentInvitations tournamentId={detail.id} />
+        </>
       ) : null}
     </ScrollView>
   );
@@ -566,6 +592,14 @@ const styles = StyleSheet.create({
   followButtonActive: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.white },
   followPressed: { opacity: 0.85 },
   followText: { color: colors.white, fontWeight: '800', fontSize: 15 },
+  applyButton: {
+    marginTop: 10,
+    backgroundColor: colors.white,
+    borderRadius: 12,
+    paddingVertical: 13,
+    alignItems: 'center',
+  },
+  applyText: { color: colors.art, fontWeight: '800', fontSize: 15 },
   segments: { flexDirection: 'row', gap: 8, paddingVertical: 18 },
   segment: {
     paddingVertical: 9,

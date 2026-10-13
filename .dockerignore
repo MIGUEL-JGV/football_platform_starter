@@ -6,6 +6,10 @@
 **/*.tsbuildinfo
 **/.expo
 **/.turbo
+**/Pods
+**/*.xcworkspace
+**/*.xcodeproj
+apps/mobile
 .git
 .github
 .env

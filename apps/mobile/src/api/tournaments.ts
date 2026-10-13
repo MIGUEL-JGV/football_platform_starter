@@ -85,6 +85,64 @@ export interface CreateAuthorizationInput {
   expiresInDays?: number;
 }
 
+export interface MyTeamSummary {
+  id: string;
+  name: string;
+  slug: string;
+  logoUrl: string | null;
+  _count: { entries: number };
+}
+
+export interface TournamentInvitation {
+  id: string;
+  label: string | null;
+  status: 'active' | 'revoked' | 'exhausted';
+  maxUses: number | null;
+  usedCount: number;
+  expiresAt: string | null;
+  createdAt: string;
+  entriesCount: number;
+}
+
+export interface CreatedInvitation extends TournamentInvitation {
+  slug: string;
+  token: string;
+  joinUrl: string;
+  qrDataUrl: string;
+}
+
+export interface ResolvedInvitation {
+  valid: boolean;
+  reason?: 'not_found' | 'revoked' | 'exhausted' | 'expired';
+  label?: string | null;
+  remainingUses?: number | null;
+  expiresAt?: string | null;
+  tournament?: {
+    id: string;
+    name: string;
+    slug: string;
+    logoUrl: string | null;
+    format: string;
+    location: string | null;
+    startDate: string | null;
+    maxTeams: number | null;
+  };
+}
+
+export interface AppliedEntry {
+  id: string;
+  registrationStatus: string;
+  team: { id: string; name: string; slug: string; logoUrl: string | null };
+}
+
+export interface ApplyEntryInput {
+  teamId: string;
+  invitationToken?: string;
+  representativeName?: string;
+  representativePhone?: string;
+  representativeEmail?: string;
+}
+
 export interface ListTournamentsParams {
   q?: string;
   status?: TournamentStatus;
@@ -432,6 +490,68 @@ export function revokeAuthorization(
 
 export function resolveAuthorization(token: string): Promise<ResolvedAuthorization> {
   return apiRequest<ResolvedAuthorization>(`/authorizations/${token}`);
+}
+
+export async function listMyTeams(token: string): Promise<MyTeamSummary[]> {
+  const data = await apiRequest<{ items: MyTeamSummary[] }>('/teams/me?pageSize=50', { token });
+  return data.items;
+}
+
+export function listInvitations(
+  token: string,
+  tournamentId: string,
+): Promise<TournamentInvitation[]> {
+  return apiRequest<TournamentInvitation[]>(`/tournaments/${tournamentId}/invitations`, { token });
+}
+
+export function createInvitation(
+  token: string,
+  tournamentId: string,
+  dto: CreateAuthorizationInput,
+): Promise<CreatedInvitation> {
+  return apiRequest<CreatedInvitation>(`/tournaments/${tournamentId}/invitations`, {
+    method: 'POST',
+    body: dto,
+    token,
+  });
+}
+
+export function revokeInvitation(
+  token: string,
+  tournamentId: string,
+  invitationId: string,
+): Promise<TournamentInvitation> {
+  return apiRequest<TournamentInvitation>(
+    `/tournaments/${tournamentId}/invitations/${invitationId}/revoke`,
+    { method: 'POST', token },
+  );
+}
+
+export function regenerateInvitation(
+  token: string,
+  tournamentId: string,
+  invitationId: string,
+): Promise<CreatedInvitation> {
+  return apiRequest<CreatedInvitation>(
+    `/tournaments/${tournamentId}/invitations/${invitationId}/regenerate`,
+    { method: 'POST', token },
+  );
+}
+
+export function resolveInvitation(token: string): Promise<ResolvedInvitation> {
+  return apiRequest<ResolvedInvitation>(`/invitations/${token}`);
+}
+
+export function applyEntry(
+  token: string,
+  tournamentId: string,
+  dto: ApplyEntryInput,
+): Promise<AppliedEntry> {
+  return apiRequest<AppliedEntry>(`/tournaments/${tournamentId}/entries`, {
+    method: 'POST',
+    body: dto,
+    token,
+  });
 }
 
 export function followTournament(id: string, token: string): Promise<{ following: boolean }> {
