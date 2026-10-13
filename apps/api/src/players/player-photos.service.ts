@@ -7,7 +7,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { PlayerPhoto } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
-import * as sharp from 'sharp';
+import sharp = require('sharp');
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
