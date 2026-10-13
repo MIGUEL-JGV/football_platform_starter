@@ -101,10 +101,12 @@ export function approveEntry(
   token: string,
   tournamentId: string,
   entryId: string,
+  authorizationToken?: string,
 ): Promise<TournamentEntry> {
   return mutate<TournamentEntry>(`/tournaments/${tournamentId}/entries/${entryId}/approve`, {
     method: 'POST',
     token,
+    headers: authorizationHeader(authorizationToken),
   });
 }
 
@@ -113,11 +115,13 @@ export function rejectEntry(
   tournamentId: string,
   entryId: string,
   reason?: string,
+  authorizationToken?: string,
 ): Promise<TournamentEntry> {
   return mutate<TournamentEntry>(`/tournaments/${tournamentId}/entries/${entryId}/reject`, {
     method: 'POST',
     body: { reason },
     token,
+    headers: authorizationHeader(authorizationToken),
   });
 }
 
@@ -125,10 +129,12 @@ export function withdrawEntry(
   token: string,
   tournamentId: string,
   entryId: string,
+  authorizationToken?: string,
 ): Promise<{ removed: boolean }> {
   return mutate<{ removed: boolean }>(`/tournaments/${tournamentId}/entries/${entryId}`, {
     method: 'DELETE',
     token,
+    headers: authorizationHeader(authorizationToken),
   });
 }
 
@@ -600,6 +606,92 @@ export function resolveInvitation(token: string): Promise<ResolvedInvitation> {
   return request<ResolvedInvitation>(`/invitations/${token}`);
 }
 
+export interface TournamentAuthorization {
+  id: string;
+  label: string | null;
+  status: string;
+  maxUses: number | null;
+  usedCount: number;
+  expiresAt: string | null;
+  createdAt: string;
+}
+
+export interface CreatedAuthorization extends TournamentAuthorization {
+  token: string;
+  authorizeUrl: string;
+  qrDataUrl: string;
+}
+
+export interface ResolvedAuthorization {
+  valid: boolean;
+  reason?: 'not_found' | 'revoked' | 'exhausted' | 'expired';
+  label?: string | null;
+  remainingUses?: number | null;
+  expiresAt?: string | null;
+  tournament?: {
+    id: string;
+    name: string;
+    slug: string;
+    logoUrl: string | null;
+    format: string;
+    location: string | null;
+    startDate: string | null;
+    status: string;
+  };
+}
+
+export function listAuthorizations(
+  token: string,
+  tournamentId: string,
+): Promise<TournamentAuthorization[]> {
+  return request<TournamentAuthorization[]>(`/tournaments/${tournamentId}/authorizations`, token);
+}
+
+export function createAuthorization(
+  token: string,
+  tournamentId: string,
+  dto: { label?: string; maxUses?: number; expiresInDays?: number },
+): Promise<CreatedAuthorization> {
+  return mutate<CreatedAuthorization>(`/tournaments/${tournamentId}/authorizations`, {
+    method: 'POST',
+    body: dto,
+    token,
+  });
+}
+
+export function revokeAuthorization(
+  token: string,
+  tournamentId: string,
+  authorizationId: string,
+): Promise<TournamentAuthorization> {
+  return mutate<TournamentAuthorization>(
+    `/tournaments/${tournamentId}/authorizations/${authorizationId}/revoke`,
+    { method: 'POST', token },
+  );
+}
+
+export function resolveAuthorization(authorizeToken: string): Promise<ResolvedAuthorization> {
+  return request<ResolvedAuthorization>(`/authorizations/${authorizeToken}`);
+}
+
+export function updateTournamentStatus(
+  token: string,
+  organizationId: string,
+  tournamentId: string,
+  status: string,
+): Promise<{ id: string; status: string }> {
+  return mutate<{ id: string; status: string }>(
+    `/organizations/${organizationId}/tournaments/${tournamentId}`,
+    { method: 'PATCH', body: { status }, token },
+  );
+}
+
+export function authorizationHeader(
+  authorizationToken?: string,
+): Record<string, string> | undefined {
+  return authorizationToken ? { 'X-Authorization-Token': authorizationToken } : undefined;
+}
+
 export interface MyTeamSummary {
   id: string;
   name: string;
@@ -643,11 +735,13 @@ export function applyEntry(
     representativeEmail?: string;
     players?: ApplyPlayerInput[];
   },
+  authorizationToken?: string,
 ): Promise<AppliedEntry> {
   return mutate<AppliedEntry>(`/tournaments/${tournamentId}/entries`, {
     method: 'POST',
     body: dto,
     token,
+    headers: authorizationHeader(authorizationToken),
   });
 }
 

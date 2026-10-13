@@ -15,9 +15,11 @@ import {
 } from '@prisma/client';
 import { AuthUser } from '../common/decorators/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuthorizationsService } from './authorizations.service';
 import { ApplyEntryDto } from './dto/tournament-entry.dto';
 import { AddRosterPlayerDto, UpdateRosterPlayerDto } from './dto/tournament-roster.dto';
 import { InvitationsService } from './invitations.service';
+import { isTournamentLocked } from './tournament-lock.util';
 
 const CONSENT_SCOPE = 'registration';
 const ADULT_AGE = 18;
@@ -36,10 +38,17 @@ export class RegistrationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly invitations: InvitationsService,
+    private readonly authorizations: AuthorizationsService,
   ) {}
 
-  async apply(tournamentId: string, user: AuthUser, dto: ApplyEntryDto) {
+  async apply(
+    tournamentId: string,
+    user: AuthUser,
+    dto: ApplyEntryDto,
+    authorizationToken?: string,
+  ) {
     const tournament = await this.requireTournament(tournamentId);
+    await this.assertUnlocked(tournament, authorizationToken);
     const invitation = dto.invitationToken
       ? await this.invitations.requireUsable(dto.invitationToken, tournamentId)
       : null;
@@ -216,8 +225,9 @@ export class RegistrationsService {
     });
   }
 
-  async approve(tournamentId: string, entryId: string, user: AuthUser) {
+  async approve(tournamentId: string, entryId: string, user: AuthUser, authorizationToken?: string) {
     const tournament = await this.requireManager(tournamentId, user);
+    await this.assertUnlocked(tournament, authorizationToken);
     const entry = await this.requireEntry(entryId, tournamentId);
     if (entry.registrationStatus !== 'pending') {
       throw new ConflictException('Solo se pueden aprobar inscripciones pendientes.');
@@ -246,8 +256,15 @@ export class RegistrationsService {
     });
   }
 
-  async reject(tournamentId: string, entryId: string, user: AuthUser, reason?: string) {
-    await this.requireManager(tournamentId, user);
+  async reject(
+    tournamentId: string,
+    entryId: string,
+    user: AuthUser,
+    reason?: string,
+    authorizationToken?: string,
+  ) {
+    const tournament = await this.requireManager(tournamentId, user);
+    await this.assertUnlocked(tournament, authorizationToken);
     const entry = await this.requireEntry(entryId, tournamentId);
     if (entry.registrationStatus !== 'pending') {
       throw new ConflictException('Solo se pueden rechazar inscripciones pendientes.');
@@ -264,8 +281,9 @@ export class RegistrationsService {
     });
   }
 
-  async withdraw(tournamentId: string, entryId: string, user: AuthUser) {
+  async withdraw(tournamentId: string, entryId: string, user: AuthUser, authorizationToken?: string) {
     const tournament = await this.requireTournament(tournamentId);
+    await this.assertUnlocked(tournament, authorizationToken);
     const entry = await this.requireEntry(entryId, tournamentId);
     const canManage = await this.canManage(tournament.id, tournament.organizationId, user);
     if (entry.requestedBy !== user.userId && !canManage) {
@@ -322,9 +340,11 @@ export class RegistrationsService {
     entryId: string,
     user: AuthUser,
     dto: AddRosterPlayerDto,
+    authorizationToken?: string,
   ) {
     const { tournament, entry } = await this.requireEntryContext(tournamentId, entryId);
     await this.assertRosterAccess(tournament, entry, user);
+    await this.assertUnlocked(tournament, authorizationToken);
     if (entry.registrationStatus !== 'approved') {
       throw new ConflictException('Solo se puede registrar convocatoria de inscripciones aprobadas.');
     }
@@ -359,9 +379,11 @@ export class RegistrationsService {
     rosterId: string,
     user: AuthUser,
     dto: UpdateRosterPlayerDto,
+    authorizationToken?: string,
   ) {
     const { tournament, entry } = await this.requireEntryContext(tournamentId, entryId);
     await this.assertRosterAccess(tournament, entry, user);
+    await this.assertUnlocked(tournament, authorizationToken);
     const roster = await this.requireRoster(entryId, rosterId);
     return this.prisma.teamRoster.update({
       where: { id: roster.id },
@@ -379,9 +401,11 @@ export class RegistrationsService {
     entryId: string,
     rosterId: string,
     user: AuthUser,
+    authorizationToken?: string,
   ) {
     const { tournament, entry } = await this.requireEntryContext(tournamentId, entryId);
     await this.assertRosterAccess(tournament, entry, user);
+    await this.assertUnlocked(tournament, authorizationToken);
     const roster = await this.requireRoster(entryId, rosterId);
     await this.prisma.teamRoster.delete({ where: { id: roster.id } });
     return { removed: true };
@@ -423,6 +447,19 @@ export class RegistrationsService {
       return;
     }
     throw new ForbiddenException('Acceso denegado.');
+  }
+
+  private async assertUnlocked(tournament: Tournament, authorizationToken?: string): Promise<void> {
+    if (!isTournamentLocked(tournament.status)) {
+      return;
+    }
+    const message =
+      'El torneo ya inició: los cambios en las inscripciones están bloqueados. Se requiere un enlace de autorización válido.';
+    if (!authorizationToken) {
+      throw new ConflictException({ code: 'TOURNAMENT_LOCKED', message });
+    }
+    const authorization = await this.authorizations.requireUsable(authorizationToken, tournament.id);
+    await this.authorizations.consume(authorization.id);
   }
 
   private async requireRoster(entryId: string, rosterId: string) {

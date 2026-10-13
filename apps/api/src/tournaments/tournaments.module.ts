@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { AuthorizationsController } from './authorizations.controller';
+import { AuthorizationsService } from './authorizations.service';
 import { InvitationsController } from './invitations.controller';
 import { InvitationsService } from './invitations.service';
 import { OrgTournamentsController } from './org-tournaments.controller';
@@ -16,18 +18,21 @@ import { TournamentsService } from './tournaments.service';
     RegistrationsController,
     RosterController,
     InvitationsController,
+    AuthorizationsController,
   ],
   providers: [
     TournamentsService,
     RegistrationsService,
     TournamentAccessService,
     InvitationsService,
+    AuthorizationsService,
   ],
   exports: [
     TournamentsService,
     RegistrationsService,
     TournamentAccessService,
     InvitationsService,
+    AuthorizationsService,
   ],
 })
 export class TournamentsModule {}

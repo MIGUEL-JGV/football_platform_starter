@@ -18,6 +18,7 @@ export const tournamentStub = (overrides: Partial<TournamentStub> = {}): Tournam
   id: TOURNAMENT_ID,
   organizationId: ORG_ID,
   visibility: 'public',
+  status: 'registration',
   maxTeams: null,
   ...overrides,
 });

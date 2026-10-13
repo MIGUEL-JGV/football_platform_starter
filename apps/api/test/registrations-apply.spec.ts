@@ -1,5 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { RegistrationsService } from '../src/tournaments/registrations.service';
 import { ME, TOURNAMENT_ID, tournamentStub } from './helpers';
 import type { ApplyEntryDto } from '../src/tournaments/dto/tournament-entry.dto';
@@ -36,6 +41,13 @@ function makeInvitations(requireUsable: (() => Promise<unknown>) | null = null) 
   };
 }
 
+function makeAuthorizations(requireUsable: (() => Promise<unknown>) | null = null) {
+  return {
+    requireUsable: vi.fn(requireUsable ?? (async () => ({ id: 'auth-1' }) as unknown)),
+    consume: vi.fn(),
+  };
+}
+
 function playersOf(dateOfBirth: Date) {
   return [{ id: CLUB_PLAYER, displayName: 'Pitucho', dateOfBirth }];
 }
@@ -59,7 +71,7 @@ describe('RegistrationsService.apply', () => {
     prisma.player.findMany
       .mockResolvedValueOnce([{ id: CLUB_PLAYER }])
       .mockResolvedValueOnce(playersOf(new Date(1990, 0, 1)));
-    const service = new RegistrationsService(prisma as never, invitations as never);
+    const service = new RegistrationsService(prisma as never, invitations as never, makeAuthorizations() as never);
 
     const error = await rejected(
       service.apply(TOURNAMENT_ID, ME, makeApplyDto({ players: [{ playerId: FOREIGN_PLAYER }] })),
@@ -77,7 +89,7 @@ describe('RegistrationsService.apply', () => {
     prisma.player.findMany
       .mockResolvedValueOnce([{ id: CLUB_PLAYER }])
       .mockResolvedValueOnce(playersOf(new Date(2012, 1, 1)));
-    const service = new RegistrationsService(prisma as never, invitations as never);
+    const service = new RegistrationsService(prisma as never, invitations as never, makeAuthorizations() as never);
 
     const error = await rejected(
       service.apply(TOURNAMENT_ID, ME, makeApplyDto({ players: [{ playerId: CLUB_PLAYER, jerseyNumber: 9 }] })),
@@ -106,7 +118,7 @@ describe('RegistrationsService.apply', () => {
           consentRecord: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }), createMany: vi.fn().mockResolvedValue({ count: 1 }) },
         } as never),
     );
-    const service = new RegistrationsService(prisma as never, invitations as never);
+    const service = new RegistrationsService(prisma as never, invitations as never, makeAuthorizations() as never);
 
     const result = await service.apply(
       TOURNAMENT_ID,
@@ -132,7 +144,7 @@ describe('RegistrationsService.apply', () => {
     const invitations = makeInvitations();
     prisma.tournament.findUnique.mockResolvedValue(tournamentStub());
     prisma.team.findUnique.mockResolvedValue({ id: 'team-1', createdBy: 'someone-else' });
-    const service = new RegistrationsService(prisma as never, invitations as never);
+    const service = new RegistrationsService(prisma as never, invitations as never, makeAuthorizations() as never);
 
     await expect(service.apply(TOURNAMENT_ID, ME, makeApplyDto())).rejects.toBeInstanceOf(
       ForbiddenException,
@@ -144,7 +156,7 @@ describe('RegistrationsService.apply', () => {
     const invitations = makeInvitations();
     prisma.tournament.findUnique.mockResolvedValue(tournamentStub({ visibility: 'private' }));
     prisma.team.findUnique.mockResolvedValue({ id: 'team-1', createdBy: ME.userId });
-    const service = new RegistrationsService(prisma as never, invitations as never);
+    const service = new RegistrationsService(prisma as never, invitations as never, makeAuthorizations() as never);
 
     await expect(service.apply(TOURNAMENT_ID, ME, makeApplyDto())).rejects.toBeInstanceOf(
       ForbiddenException,
@@ -157,7 +169,7 @@ describe('RegistrationsService.apply', () => {
     prisma.tournament.findUnique.mockResolvedValue(tournamentStub());
     prisma.team.findUnique.mockResolvedValue({ id: 'team-1', createdBy: ME.userId });
     prisma.tournamentTeam.findUnique.mockResolvedValue({ id: 'entry-1', registrationStatus: 'pending' });
-    const service = new RegistrationsService(prisma as never, invitations as never);
+    const service = new RegistrationsService(prisma as never, invitations as never, makeAuthorizations() as never);
 
     await expect(service.apply(TOURNAMENT_ID, ME, makeApplyDto())).rejects.toBeInstanceOf(
       ConflictException,
@@ -176,7 +188,7 @@ describe('RegistrationsService.apply', () => {
         { id: CLUB_PLAYER, displayName: 'A', dateOfBirth: new Date(1990, 0, 1) },
         { id: 'other-club-player', displayName: 'B', dateOfBirth: new Date(1991, 0, 1) },
       ]);
-    const service = new RegistrationsService(prisma as never, invitations as never);
+    const service = new RegistrationsService(prisma as never, invitations as never, makeAuthorizations() as never);
 
     const error = await rejected(
       service.apply(
@@ -203,7 +215,7 @@ describe('RegistrationsService.apply', () => {
     prisma.player.findMany
       .mockResolvedValueOnce([{ id: CLUB_PLAYER }])
       .mockResolvedValueOnce(playersOf(new Date(1990, 0, 1)));
-    const service = new RegistrationsService(prisma as never, invitations as never);
+    const service = new RegistrationsService(prisma as never, invitations as never, makeAuthorizations() as never);
 
     const error = await rejected(
       service.apply(
@@ -239,7 +251,7 @@ describe('RegistrationsService.reject/approve', () => {
     prisma.tournamentTeam.update.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
       Promise.resolve({ id: 'entry-1', ...data }),
     );
-    const service = new RegistrationsService(prisma as never, makeInvitations() as never);
+    const service = new RegistrationsService(prisma as never, makeInvitations() as never, makeAuthorizations() as never);
 
     const result = await service.reject(TOURNAMENT_ID, 'entry-1', ME, 'Plantilla incompleta');
     expect(result).toMatchObject({
@@ -256,7 +268,7 @@ describe('RegistrationsService.reject/approve', () => {
     prisma.tournamentTeam.update.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
       Promise.resolve({ id: 'entry-1', ...data }),
     );
-    const service = new RegistrationsService(prisma as never, makeInvitations() as never);
+    const service = new RegistrationsService(prisma as never, makeInvitations() as never, makeAuthorizations() as never);
 
     const result = await service.reject(TOURNAMENT_ID, 'entry-1', ME);
     expect(result.reviewNote).toBeNull();
@@ -269,7 +281,7 @@ describe('RegistrationsService.reject/approve', () => {
     prisma.tournamentTeam.update.mockImplementation(({ data }: { data: Record<string, unknown> }) =>
       Promise.resolve({ id: 'entry-1', ...data }),
     );
-    const service = new RegistrationsService(prisma as never, makeInvitations() as never);
+    const service = new RegistrationsService(prisma as never, makeInvitations() as never, makeAuthorizations() as never);
 
     await expect(service.approve(TOURNAMENT_ID, 'entry-1', ME)).rejects.toBeInstanceOf(
       ConflictException,
@@ -278,5 +290,46 @@ describe('RegistrationsService.reject/approve', () => {
     prisma.tournamentTeam.findFirst.mockResolvedValue({ id: 'entry-2', registrationStatus: 'pending' });
     const result = await service.approve(TOURNAMENT_ID, 'entry-2', ME);
     expect(result).toMatchObject({ registrationStatus: 'approved', reviewNote: null, approvedBy: ME.userId });
+  });
+});
+
+describe('RegistrationsService candado por inicio de torneo', () => {
+  it('bloquea la operación si el torneo ya inició y no hay enlace', async () => {
+    const prisma = makePrisma();
+    prisma.tournament.findUnique.mockResolvedValue(tournamentStub({ status: 'in_progress' }));
+    const authorizations = makeAuthorizations();
+    const service = new RegistrationsService(prisma as never, makeInvitations() as never, authorizations as never);
+
+    const error = await rejected(service.apply(TOURNAMENT_ID, ME, makeApplyDto()));
+    expect(error).toBeInstanceOf(ConflictException);
+    expect(error.message).toContain('bloqueados');
+    expect(authorizations.requireUsable).not.toHaveBeenCalled();
+  });
+
+  it('permite la operación con un enlace de autorización válido', async () => {
+    const prisma = makePrisma();
+    prisma.tournament.findUnique.mockResolvedValue(tournamentStub({ status: 'in_progress' }));
+    prisma.team.findUnique.mockResolvedValue(null);
+    const authorizations = makeAuthorizations();
+    const service = new RegistrationsService(prisma as never, makeInvitations() as never, authorizations as never);
+
+    await expect(
+      service.apply(TOURNAMENT_ID, ME, makeApplyDto(), 'token-valido'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(authorizations.requireUsable).toHaveBeenCalledWith('token-valido', TOURNAMENT_ID);
+    expect(authorizations.consume).toHaveBeenCalledWith('auth-1');
+  });
+
+  it('no exige enlace mientras el torneo sigue abierto', async () => {
+    const prisma = makePrisma();
+    prisma.tournament.findUnique.mockResolvedValue(tournamentStub({ status: 'registration' }));
+    prisma.team.findUnique.mockResolvedValue(null);
+    const authorizations = makeAuthorizations();
+    const service = new RegistrationsService(prisma as never, makeInvitations() as never, authorizations as never);
+
+    await expect(service.apply(TOURNAMENT_ID, ME, makeApplyDto())).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(authorizations.requireUsable).not.toHaveBeenCalled();
   });
 });

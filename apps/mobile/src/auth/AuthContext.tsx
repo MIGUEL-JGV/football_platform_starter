@@ -1,6 +1,14 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { getMeRequest, loginRequest, registerRequest, PublicUser } from '../api/auth';
-import { clearToken, loadToken, saveToken } from './token';
+import { setAuthorizationToken } from '../api/authorization';
+import {
+  clearAuthorizationToken,
+  clearToken,
+  loadAuthorizationToken,
+  loadToken,
+  saveAuthorizationToken,
+  saveToken,
+} from './token';
 
 type AuthStatus = 'loading' | 'authenticated' | 'guest';
 
@@ -8,10 +16,13 @@ interface AuthContextValue {
   status: AuthStatus;
   user: PublicUser | null;
   token: string | null;
+  authorizationToken: string | null;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, displayName: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  activateAuthorization: (token: string) => Promise<void>;
+  clearAuthorization: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -20,11 +31,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>('loading');
   const [user, setUser] = useState<PublicUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [authorizationToken, setAuthorizationTokenState] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
     (async () => {
       const stored = await loadToken();
+      const storedAuthorization = await loadAuthorizationToken();
+      if (active) {
+        setAuthorizationToken(storedAuthorization);
+        setAuthorizationTokenState(storedAuthorization);
+      }
       if (!stored) {
         if (active) setStatus('guest');
         return;
@@ -74,8 +91,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => {
     await clearToken();
+    await clearAuthorizationToken();
+    setAuthorizationToken(null);
     setToken(null);
     setUser(null);
+    setAuthorizationTokenState(null);
     setStatus('guest');
   }, []);
 
@@ -85,9 +105,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(me);
   }, [token]);
 
+  const activateAuthorization = useCallback(async (nextToken: string) => {
+    await saveAuthorizationToken(nextToken);
+    setAuthorizationToken(nextToken);
+    setAuthorizationTokenState(nextToken);
+  }, []);
+
+  const clearAuthorization = useCallback(async () => {
+    await clearAuthorizationToken();
+    setAuthorizationToken(null);
+    setAuthorizationTokenState(null);
+  }, []);
+
   const value = useMemo(
-    () => ({ status, user, token, signIn, signUp, signOut, refreshUser }),
-    [status, user, token, signIn, signUp, signOut, refreshUser],
+    () => ({
+      status,
+      user,
+      token,
+      authorizationToken,
+      signIn,
+      signUp,
+      signOut,
+      refreshUser,
+      activateAuthorization,
+      clearAuthorization,
+    }),
+    [
+      status,
+      user,
+      token,
+      authorizationToken,
+      signIn,
+      signUp,
+      signOut,
+      refreshUser,
+      activateAuthorization,
+      clearAuthorization,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

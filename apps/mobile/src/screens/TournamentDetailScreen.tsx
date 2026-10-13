@@ -25,10 +25,11 @@ import {
   STAT_COLORS,
   TeamBalance,
 } from '../components/StatCharts';
+import { TournamentManagement } from '../components/TournamentManagement';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TournamentDetail'>;
 
-type Segment = 'resumen' | 'tabla' | 'calendario' | 'resultados' | 'estadisticas';
+type Segment = 'resumen' | 'tabla' | 'calendario' | 'resultados' | 'estadisticas' | 'gestion';
 
 const SEGMENTS: { key: Segment; label: string }[] = [
   { key: 'resumen', label: 'Resumen' },
@@ -37,6 +38,8 @@ const SEGMENTS: { key: Segment; label: string }[] = [
   { key: 'resultados', label: 'Resultados' },
   { key: 'estadisticas', label: 'Estadísticas' },
 ];
+
+const MANAGEMENT_SEGMENT: { key: Segment; label: string } = { key: 'gestion', label: 'Gestión' };
 
 const isFinished = (match: Match) => match.homeScore !== null && match.awayScore !== null;
 
@@ -169,6 +172,8 @@ export default function TournamentDetailScreen({ route, navigation }: Props) {
   if (!detail) {
     return null;
   }
+
+  const segments = detail.canManage ? [...SEGMENTS, MANAGEMENT_SEGMENT] : SEGMENTS;
 
   const openMatch = (match: Match) =>
     navigation.navigate('MatchDetail', { tournamentId, matchId: match.id });
@@ -496,7 +501,7 @@ export default function TournamentDetailScreen({ route, navigation }: Props) {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.segments}
       >
-        {SEGMENTS.map((item) => (
+        {segments.map((item) => (
           <Pressable
             key={item.key}
             style={[styles.segment, segment === item.key && styles.segmentActive]}
@@ -514,6 +519,15 @@ export default function TournamentDetailScreen({ route, navigation }: Props) {
       {segment === 'calendario' ? renderCalendar() : null}
       {segment === 'resultados' ? renderResults() : null}
       {segment === 'estadisticas' ? renderStats() : null}
+      {segment === 'gestion' ? (
+        <TournamentManagement
+          tournamentId={detail.id}
+          organizationId={detail.organization.id}
+          status={detail.status}
+          canCreateAuthorization={detail.myOrgRole === 'owner'}
+          onChanged={() => load('refresh')}
+        />
+      ) : null}
     </ScrollView>
   );
 }

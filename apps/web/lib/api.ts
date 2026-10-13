@@ -219,8 +219,12 @@ export async function listTournaments(
   };
 }
 
-export async function request<T>(path: string, token?: string): Promise<T> {
-  const headers: Record<string, string> = {};
+export async function request<T>(
+  path: string,
+  token?: string,
+  extraHeaders?: Record<string, string>,
+): Promise<T> {
+  const headers: Record<string, string> = { ...extraHeaders };
   if (token) headers.Authorization = `Bearer ${token}`;
   const response = await fetch(`${API_BASE_URL}${path}`, { cache: 'no-store', headers });
   if (response.status === 404) {
@@ -234,9 +238,14 @@ export async function request<T>(path: string, token?: string): Promise<T> {
 
 export async function mutate<T>(
   path: string,
-  options: { method?: 'POST' | 'PATCH' | 'DELETE'; body?: unknown; token?: string } = {},
+  options: {
+    method?: 'POST' | 'PATCH' | 'DELETE';
+    body?: unknown;
+    token?: string;
+    headers?: Record<string, string>;
+  } = {},
 ): Promise<T> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...options.headers };
   if (options.token) headers.Authorization = `Bearer ${options.token}`;
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: options.method ?? 'POST',

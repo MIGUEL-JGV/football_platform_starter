@@ -4,10 +4,16 @@ import { getMe } from './api';
 import type { WebUser } from './api';
 
 export const SESSION_COOKIE = 'cancha.session';
+export const AUTHORIZE_COOKIE = 'cancha.authorize';
 
 export async function getToken(): Promise<string | null> {
   const store = await cookies();
   return store.get(SESSION_COOKIE)?.value ?? null;
+}
+
+export async function getAuthorizationToken(): Promise<string | null> {
+  const store = await cookies();
+  return store.get(AUTHORIZE_COOKIE)?.value ?? null;
 }
 
 export interface Session {

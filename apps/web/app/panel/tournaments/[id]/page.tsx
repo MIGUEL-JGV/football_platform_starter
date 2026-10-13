@@ -1,14 +1,17 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { Topbar } from '../../../../components/Topbar';
+import { AuthorizationManager } from '../../../../components/AuthorizationManager';
 import { EntryRow } from '../../../../components/EntryActions';
 import { InvitationManager } from '../../../../components/InvitationManager';
 import { MatchManager } from '../../../../components/MatchManager';
 import { NewsManager } from '../../../../components/NewsManager';
 import { PhaseManager } from '../../../../components/PhaseManager';
-import { getSession } from '../../../../lib/auth';
+import { TournamentStatusControls } from '../../../../components/TournamentStatusControls';
+import { getAuthorizationToken, getSession } from '../../../../lib/auth';
 import { getTournamentDetail } from '../../../../lib/api';
 import {
+  listAuthorizations,
   listEntries,
   listEntryRoster,
   listInvitations,
@@ -21,6 +24,7 @@ import {
   type Matchday,
   type Phase,
   type RosterPlayer,
+  type TournamentAuthorization,
   type TournamentEntry,
   type TournamentInvitation,
 } from '../../../../lib/manage';
@@ -37,6 +41,7 @@ export default async function ManageTournamentPage({ params }: { params: Params 
 
   let entries: TournamentEntry[] = [];
   let invitations: TournamentInvitation[] = [];
+  let authorizations: TournamentAuthorization[] = [];
   let phases: Phase[] = [];
   let matches: ManageMatch[] = [];
   let news: ManageNewsPost[] = [];
@@ -73,6 +78,14 @@ export default async function ManageTournamentPage({ params }: { params: Params 
   } catch {
     invitations = [];
   }
+  if (detail.myOrgRole === 'owner') {
+    try {
+      authorizations = await listAuthorizations(session.token, id);
+    } catch {
+      authorizations = [];
+    }
+  }
+  const hasActiveAuthorization = (await getAuthorizationToken()) !== null;
   try {
     phases = await listPhases(session.token, id);
     for (const phase of phases) {
@@ -118,6 +131,12 @@ export default async function ManageTournamentPage({ params }: { params: Params 
           <Link className="panel-link" href={`/tournaments/${id}`}>Ver ficha pública ↗</Link>
         </div>
 
+        <TournamentStatusControls
+          organizationId={detail.organization.id}
+          tournamentId={id}
+          status={detail.status}
+        />
+
         <div className="d-block">
           <div className="section-heading">
             <h3>Inscripciones</h3>
@@ -147,6 +166,14 @@ export default async function ManageTournamentPage({ params }: { params: Params 
         </div>
 
         <InvitationManager tournamentId={id} invitations={invitations} />
+
+        {detail.myOrgRole === 'owner' ? (
+          <AuthorizationManager
+            tournamentId={id}
+            authorizations={authorizations}
+            hasActiveAuthorization={hasActiveAuthorization}
+          />
+        ) : null}
 
         <PhaseManager
           tournamentId={id}

@@ -11,6 +11,7 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import { AuthorizationToken } from '../common/decorators/authorization-token.decorator';
 import { AuthUser, CurrentUser } from '../common/decorators/current-user.decorator';
 import { TournamentRolesGuard } from '../common/guards/tournament-roles.guard';
 import { AddRosterPlayerDto, UpdateRosterPlayerDto } from './dto/tournament-roster.dto';
@@ -36,8 +37,9 @@ export class RosterController {
     @Param('entryId', ParseUUIDPipe) entryId: string,
     @CurrentUser() user: AuthUser,
     @Body() dto: AddRosterPlayerDto,
+    @AuthorizationToken() authorizationToken?: string,
   ) {
-    return this.registrations.addRosterPlayer(id, entryId, user, dto);
+    return this.registrations.addRosterPlayer(id, entryId, user, dto, authorizationToken);
   }
 
   @Patch(':rosterId')
@@ -47,8 +49,9 @@ export class RosterController {
     @Param('rosterId', ParseUUIDPipe) rosterId: string,
     @CurrentUser() user: AuthUser,
     @Body() dto: UpdateRosterPlayerDto,
+    @AuthorizationToken() authorizationToken?: string,
   ) {
-    return this.registrations.updateRosterPlayer(id, entryId, rosterId, user, dto);
+    return this.registrations.updateRosterPlayer(id, entryId, rosterId, user, dto, authorizationToken);
   }
 
   @HttpCode(HttpStatus.NO_CONTENT)
@@ -58,7 +61,8 @@ export class RosterController {
     @Param('entryId', ParseUUIDPipe) entryId: string,
     @Param('rosterId', ParseUUIDPipe) rosterId: string,
     @CurrentUser() user: AuthUser,
+    @AuthorizationToken() authorizationToken?: string,
   ) {
-    return this.registrations.removeRosterPlayer(id, entryId, rosterId, user);
+    return this.registrations.removeRosterPlayer(id, entryId, rosterId, user, authorizationToken);
   }
 }

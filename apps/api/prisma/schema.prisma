@@ -91,6 +91,7 @@ model User {
   newsPosts       NewsPost[]
   notifications   Notification[]
   createdInvitations      TournamentInvitation[] @relation("InvitationCreator")
+  createdAuthorizations   TournamentAuthorization[] @relation("AuthorizationCreator")
   reviewedEntries         TournamentTeam[]       @relation("RegistrationReviewer")
   uploadedPhotos          PlayerPhoto[]
   uploadedDocuments       PlayerDocument[]
@@ -179,6 +180,7 @@ model Tournament {
   matches              Match[]
   news                 NewsPost[]
   invitations          TournamentInvitation[]
+  authorizations       TournamentAuthorization[]
 
   @@unique([organizationId, slug])
   @@index([status, visibility, startDate])
@@ -564,4 +566,28 @@ model AuditLog {
   @@index([tournamentId, createdAt])
   @@index([entityType, entityId])
   @@map("audit_logs")
+}
+
+enum AuthorizationStatus {
+  active
+  revoked
+}
+
+model TournamentAuthorization {
+  id           String              @id @default(uuid()) @db.Uuid
+  tournamentId String              @map("tournament_id") @db.Uuid
+  tokenHash    String              @unique @map("token_hash") @db.VarChar(128)
+  label        String?             @db.VarChar(120)
+  status       AuthorizationStatus @default(active)
+  maxUses      Int?                @map("max_uses") @db.SmallInt
+  usedCount    Int                 @default(0) @map("used_count") @db.SmallInt
+  expiresAt    DateTime?           @map("expires_at") @db.Timestamptz
+  revokedAt    DateTime?           @map("revoked_at") @db.Timestamptz
+  createdBy    String              @map("created_by") @db.Uuid
+  createdAt    DateTime            @default(now()) @map("created_at") @db.Timestamptz
+  tournament   Tournament          @relation(fields: [tournamentId], references: [id])
+  creator      User                @relation("AuthorizationCreator", fields: [createdBy], references: [id])
+
+  @@index([tournamentId, status])
+  @@map("tournament_authorizations")
 }

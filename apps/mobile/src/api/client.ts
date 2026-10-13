@@ -1,4 +1,5 @@
 import { getApiBaseUrl } from '../config';
+import { getAuthorizationToken } from './authorization';
 
 export class ApiError extends Error {
   statusCode: number;
@@ -18,11 +19,14 @@ export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   body?: unknown;
   token?: string | null;
+  headers?: Record<string, string>;
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, token } = options;
-  const headers: Record<string, string> = {};
+  const { method = 'GET', body, token, headers: extraHeaders } = options;
+  const headers: Record<string, string> = { ...extraHeaders };
+  const authorizationToken = getAuthorizationToken();
+  if (authorizationToken) headers['X-Authorization-Token'] = authorizationToken;
   if (token) headers.Authorization = `Bearer ${token}`;
   if (body !== undefined) headers['Content-Type'] = 'application/json';
 

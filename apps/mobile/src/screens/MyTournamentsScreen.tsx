@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -61,7 +61,15 @@ export default function MyTournamentsScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.header}>
-        <Text style={styles.title}>Mis torneos</Text>
+        <View style={styles.headerRow}>
+          <Text style={styles.title}>Mis torneos</Text>
+          <Pressable
+            onPress={() => navigation.navigate('CreateTournament')}
+            style={({ pressed }) => [styles.createBtn, pressed && styles.createBtnPressed]}
+          >
+            <Text style={styles.createBtnText}>+ Crear torneo</Text>
+          </Pressable>
+        </View>
         <Text style={styles.subtitle}>Los que sigues y en los que participas.</Text>
       </View>
       {loading ? (
@@ -107,6 +115,15 @@ export default function MyTournamentsScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  createBtn: {
+    backgroundColor: colors.green,
+    borderRadius: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+  },
+  createBtnPressed: { opacity: 0.85 },
+  createBtnText: { color: colors.white, fontWeight: '800', fontSize: 12 },
   guest: { flex: 1, padding: 24, justifyContent: 'center', gap: 10 },
   eyebrow: {
     color: colors.green,

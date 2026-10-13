@@ -1,11 +1,13 @@
 'use server';
 
+import { cookies } from 'next/headers';
 import { revalidatePath } from 'next/cache';
-import { getToken } from './auth';
+import { AUTHORIZE_COOKIE, getAuthorizationToken, getToken } from './auth';
 import {
   applyEntry,
   approveEntry,
   clearMatchResult,
+  createAuthorization,
   createInvitation,
   createMatch,
   createMatchday,
@@ -21,16 +23,19 @@ import {
   recordMatchResult,
   regenerateInvitation,
   rejectEntry,
+  revokeAuthorization,
   revokeInvitation,
   setPrimaryPlayerPhoto,
   unpublishNews,
   updateMatchEvent,
   updateNews,
+  updateTournamentStatus,
   uploadPlayerPhoto,
   validateMatchResult,
   withdrawEntry,
   type AppliedEntry,
   type CreateTournamentInput,
+  type CreatedAuthorization,
   type CreatedInvitation,
   type ManagedMatchEvent,
   type ManageNewsPost,
@@ -50,14 +55,20 @@ export interface EntryActionResult {
 async function runEntryAction(
   tournamentId: string,
   entryId: string,
-  action: (token: string, tournamentId: string, entryId: string) => Promise<TournamentEntry>,
+  action: (
+    token: string,
+    tournamentId: string,
+    entryId: string,
+    authorizationToken?: string,
+  ) => Promise<TournamentEntry>,
 ): Promise<EntryActionResult> {
   const token = await getToken();
   if (!token) {
     return { ok: false, error: 'auth' };
   }
+  const authorizationToken = (await getAuthorizationToken()) ?? undefined;
   try {
-    const entry = await action(token, tournamentId, entryId);
+    const entry = await action(token, tournamentId, entryId, authorizationToken);
     revalidatePath(`/panel/tournaments/${tournamentId}`);
     revalidatePath(`/tournaments/${tournamentId}`);
     return { ok: true, entry };
@@ -79,8 +90,8 @@ export async function rejectEntryAction(
   entryId: string,
   reason?: string,
 ): Promise<EntryActionResult> {
-  return runEntryAction(tournamentId, entryId, (token, tid, eid) =>
-    rejectEntry(token, tid, eid, reason),
+  return runEntryAction(tournamentId, entryId, (token, tid, eid, authorizationToken) =>
+    rejectEntry(token, tid, eid, reason, authorizationToken),
   );
 }
 
@@ -92,8 +103,9 @@ export async function withdrawEntryAction(
   if (!token) {
     return { ok: false, error: 'auth' };
   }
+  const authorizationToken = (await getAuthorizationToken()) ?? undefined;
   try {
-    await withdrawEntry(token, tournamentId, entryId);
+    await withdrawEntry(token, tournamentId, entryId, authorizationToken);
     revalidatePath(`/panel/tournaments/${tournamentId}`);
     return { ok: true };
   } catch (error) {
@@ -406,8 +418,9 @@ export async function applyEntryAction(
 ): Promise<ApplyEntryResult> {
   const token = await getToken();
   if (!token) return { ok: false, error: 'auth' };
+  const authorizationToken = (await getAuthorizationToken()) ?? undefined;
   try {
-    const entry = await applyEntry(token, tournamentId, dto);
+    const entry = await applyEntry(token, tournamentId, dto, authorizationToken);
     revalidatePath(`/tournaments/${tournamentId}`);
     revalidatePath('/panel');
     return { ok: true, entry };
@@ -562,4 +575,89 @@ export async function deletePhotoAction(playerId: string, photoId: string): Prom
       error: error instanceof Error ? error.message : 'No se pudo eliminar la fotografía.',
     };
   }
+}
+
+export interface StatusActionResult {
+  ok: boolean;
+  error?: string;
+  status?: string;
+}
+
+export async function updateTournamentStatusAction(
+  organizationId: string,
+  tournamentId: string,
+  status: string,
+): Promise<StatusActionResult> {
+  const token = await getToken();
+  if (!token) return { ok: false, error: 'auth' };
+  try {
+    const tournament = await updateTournamentStatus(token, organizationId, tournamentId, status);
+    revalidateSchedule(tournamentId);
+    revalidatePath('/panel');
+    return { ok: true, status: tournament.status };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'No se pudo actualizar el estado del torneo.',
+    };
+  }
+}
+
+export interface AuthorizationActionResult {
+  ok: boolean;
+  error?: string;
+  authorization?: CreatedAuthorization;
+}
+
+export async function createAuthorizationAction(
+  tournamentId: string,
+  dto: { label?: string; maxUses?: number; expiresInDays?: number },
+): Promise<AuthorizationActionResult> {
+  const token = await getToken();
+  if (!token) return { ok: false, error: 'auth' };
+  try {
+    const authorization = await createAuthorization(token, tournamentId, dto);
+    revalidatePath(`/panel/tournaments/${tournamentId}`);
+    return { ok: true, authorization };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'No se pudo crear el enlace de autorización.',
+    };
+  }
+}
+
+export async function revokeAuthorizationAction(
+  tournamentId: string,
+  authorizationId: string,
+): Promise<SimpleResult> {
+  const token = await getToken();
+  if (!token) return { ok: false, error: 'auth' };
+  try {
+    await revokeAuthorization(token, tournamentId, authorizationId);
+    revalidatePath(`/panel/tournaments/${tournamentId}`);
+    return { ok: true };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'No se pudo revocar el enlace de autorización.',
+    };
+  }
+}
+
+export async function activateAuthorizationAction(authorizeToken: string): Promise<SimpleResult> {
+  const store = await cookies();
+  store.set(AUTHORIZE_COOKIE, authorizeToken, {
+    path: '/',
+    httpOnly: true,
+    sameSite: 'lax',
+    maxAge: 60 * 60 * 24 * 365,
+  });
+  return { ok: true };
+}
+
+export async function clearAuthorizationAction(): Promise<SimpleResult> {
+  const store = await cookies();
+  store.delete(AUTHORIZE_COOKIE);
+  return { ok: true };
 }

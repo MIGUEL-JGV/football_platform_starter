@@ -62,9 +62,13 @@ export class AllExceptionsFilter implements ExceptionFilter {
           errors: rawMessage,
         };
       }
+      const explicitCode = (payload as { code?: unknown })?.code;
       return {
         statusCode: status,
-        code: STATUS_CODES[status] ?? `HTTP_${status}`,
+        code:
+          typeof explicitCode === 'string'
+            ? explicitCode
+            : (STATUS_CODES[status] ?? `HTTP_${status}`),
         message: typeof rawMessage === 'string' ? rawMessage : exception.message,
       };
     }

@@ -40,7 +40,49 @@ export interface TournamentListItem {
 
 export interface TournamentDetail extends TournamentListItem {
   myRole?: string | null;
+  myOrgRole?: string | null;
+  canManage?: boolean;
   following: boolean;
+}
+
+export interface TournamentAuthorization {
+  id: string;
+  label: string | null;
+  status: 'active' | 'revoked';
+  maxUses: number | null;
+  usedCount: number;
+  expiresAt: string | null;
+  createdAt: string;
+}
+
+export interface CreatedAuthorization extends TournamentAuthorization {
+  token: string;
+  authorizeUrl: string;
+  qrDataUrl: string;
+}
+
+export interface ResolvedAuthorization {
+  valid: boolean;
+  reason?: 'not_found' | 'revoked' | 'exhausted' | 'expired';
+  label?: string | null;
+  remainingUses?: number | null;
+  expiresAt?: string | null;
+  tournament?: {
+    id: string;
+    name: string;
+    slug: string;
+    logoUrl: string | null;
+    format: string;
+    location: string | null;
+    startDate: string | null;
+    status: TournamentStatus;
+  };
+}
+
+export interface CreateAuthorizationInput {
+  label?: string;
+  maxUses?: number;
+  expiresInDays?: number;
 }
 
 export interface ListTournamentsParams {
@@ -264,6 +306,28 @@ export interface MyTournamentsResponse {
   total: number;
 }
 
+export interface CreateTournamentInput {
+  name: string;
+  format: FootballFormat;
+  description?: string;
+  location?: string;
+  categoryLabel?: string;
+  competitionFormat?: string;
+  maxTeams?: number;
+  minAge?: number;
+  maxAge?: number;
+  visibility?: TournamentVisibility;
+}
+
+export interface CreatedTournament {
+  id: string;
+  name: string;
+  slug: string;
+  format: FootballFormat;
+  status: TournamentStatus;
+  organization: { id: string; name: string; slug: string };
+}
+
 function buildQuery(params: Record<string, string | number | undefined>): string {
   const parts = Object.entries(params)
     .filter(([, value]) => value !== undefined && value !== null && value !== '')
@@ -313,6 +377,61 @@ export function getPlayerProfile(id: string): Promise<PlayerProfile> {
 
 export function myTournaments(token: string): Promise<MyTournamentsResponse> {
   return apiRequest<MyTournamentsResponse>('/tournaments/me/tournaments', { token });
+}
+
+export function createTournament(
+  token: string,
+  dto: CreateTournamentInput,
+): Promise<CreatedTournament> {
+  return apiRequest<CreatedTournament>('/tournaments', { method: 'POST', body: dto, token });
+}
+
+export function updateTournamentStatus(
+  token: string,
+  organizationId: string,
+  tournamentId: string,
+  status: TournamentStatus,
+): Promise<{ id: string; status: TournamentStatus }> {
+  return apiRequest<{ id: string; status: TournamentStatus }>(
+    `/organizations/${organizationId}/tournaments/${tournamentId}`,
+    { method: 'PATCH', body: { status }, token },
+  );
+}
+
+export function listAuthorizations(
+  token: string,
+  tournamentId: string,
+): Promise<TournamentAuthorization[]> {
+  return apiRequest<TournamentAuthorization[]>(`/tournaments/${tournamentId}/authorizations`, {
+    token,
+  });
+}
+
+export function createAuthorization(
+  token: string,
+  tournamentId: string,
+  dto: CreateAuthorizationInput,
+): Promise<CreatedAuthorization> {
+  return apiRequest<CreatedAuthorization>(`/tournaments/${tournamentId}/authorizations`, {
+    method: 'POST',
+    body: dto,
+    token,
+  });
+}
+
+export function revokeAuthorization(
+  token: string,
+  tournamentId: string,
+  authorizationId: string,
+): Promise<TournamentAuthorization> {
+  return apiRequest<TournamentAuthorization>(
+    `/tournaments/${tournamentId}/authorizations/${authorizationId}/revoke`,
+    { method: 'POST', token },
+  );
+}
+
+export function resolveAuthorization(token: string): Promise<ResolvedAuthorization> {
+  return apiRequest<ResolvedAuthorization>(`/authorizations/${token}`);
 }
 
 export function followTournament(id: string, token: string): Promise<{ following: boolean }> {

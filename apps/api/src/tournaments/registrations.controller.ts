@@ -10,6 +10,7 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import { AuthorizationToken } from '../common/decorators/authorization-token.decorator';
 import { AuthUser, CurrentUser } from '../common/decorators/current-user.decorator';
 import { TournamentRolesGuard } from '../common/guards/tournament-roles.guard';
 import { ApplyEntryDto, RejectEntryDto } from './dto/tournament-entry.dto';
@@ -39,8 +40,9 @@ export class RegistrationsController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthUser,
     @Body() dto: ApplyEntryDto,
+    @AuthorizationToken() authorizationToken?: string,
   ) {
-    return this.registrations.apply(id, user, dto);
+    return this.registrations.apply(id, user, dto, authorizationToken);
   }
 
   @HttpCode(HttpStatus.OK)
@@ -49,8 +51,9 @@ export class RegistrationsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Param('entryId', ParseUUIDPipe) entryId: string,
     @CurrentUser() user: AuthUser,
+    @AuthorizationToken() authorizationToken?: string,
   ) {
-    return this.registrations.approve(id, entryId, user);
+    return this.registrations.approve(id, entryId, user, authorizationToken);
   }
 
   @HttpCode(HttpStatus.OK)
@@ -60,8 +63,9 @@ export class RegistrationsController {
     @Param('entryId', ParseUUIDPipe) entryId: string,
     @CurrentUser() user: AuthUser,
     @Body() dto: RejectEntryDto,
+    @AuthorizationToken() authorizationToken?: string,
   ) {
-    return this.registrations.reject(id, entryId, user, dto.reason);
+    return this.registrations.reject(id, entryId, user, dto.reason, authorizationToken);
   }
 
   @Delete(':entryId')
@@ -69,7 +73,8 @@ export class RegistrationsController {
     @Param('id', ParseUUIDPipe) id: string,
     @Param('entryId', ParseUUIDPipe) entryId: string,
     @CurrentUser() user: AuthUser,
+    @AuthorizationToken() authorizationToken?: string,
   ) {
-    return this.registrations.withdraw(id, entryId, user);
+    return this.registrations.withdraw(id, entryId, user, authorizationToken);
   }
 }

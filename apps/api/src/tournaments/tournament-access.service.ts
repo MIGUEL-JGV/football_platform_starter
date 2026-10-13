@@ -71,6 +71,19 @@ export class TournamentAccessService {
     throw new NotFoundException('Torneo no encontrado.');
   }
 
+  async requireOrgOwner(organizationId: string, user: AuthUser): Promise<void> {
+    const membership = await this.prisma.organizationMember.findUnique({
+      where: { organizationId_userId: { organizationId, userId: user.userId } },
+    });
+    if (
+      !membership ||
+      membership.status !== MembershipStatus.active ||
+      membership.role !== OrganizationRole.owner
+    ) {
+      throw new ForbiddenException('Solo el creador del torneo puede realizar esta acción.');
+    }
+  }
+
   async requireOrgOwnerAdmin(organizationId: string, user: AuthUser): Promise<void> {
     const membership = await this.prisma.organizationMember.findUnique({
       where: { organizationId_userId: { organizationId, userId: user.userId } },
