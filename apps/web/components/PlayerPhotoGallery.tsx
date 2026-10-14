@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   deletePhotoAction,
@@ -8,41 +8,57 @@ import {
   uploadPhotoAction,
 } from '../lib/manage-actions';
 import type { PlayerPhoto } from '../lib/manage';
+import { PhotoEditor } from './PhotoEditor';
+import { PhotoPreview } from './PhotoPreview';
 
 export function PlayerPhotoGallery({
   playerId,
   initialPhotos,
   canManage,
+  playerName,
+  playerAge,
 }: {
   playerId: string;
   initialPhotos: PlayerPhoto[];
   canManage: boolean;
+  playerName?: string;
+  playerAge?: number | null;
 }) {
   const router = useRouter();
   const [photos, setPhotos] = useState<PlayerPhoto[]>(initialPhotos);
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [pendingAction, setPendingAction] = useState<string | null>(null);
-  const [state, formAction] = useActionState<PlayerPhoto | null, FormData>(
-    async (_prev, formData) => {
-      const result = await uploadPhotoAction(playerId, formData);
-      if (result.ok && result.photo) {
-        setPhotos((current) => [result.photo!, ...current]);
-        router.refresh();
-        return result.photo;
-      }
-      setMutationError(result.error === 'auth' ? 'Tu sesión expiró.' : (result.error ?? 'Error'));
-      return null;
-    },
-    null,
-  );
+  const [editing, setEditing] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   if (!canManage) {
     return null;
   }
 
+  const canPublish = playerAge == null || playerAge >= 18;
+  const previewPhoto = photos.find((photo) => photo.isPrimary) ?? photos[0];
+
+  async function handleSave(blob: Blob, makePublic: boolean) {
+    setMutationError(null);
+    setSuccess(false);
+    const formData = new FormData();
+    formData.append('file', blob, 'photo.webp');
+    formData.append('makePublic', makePublic ? 'true' : 'false');
+    const result = await uploadPhotoAction(playerId, formData);
+    if (result.ok && result.photo) {
+      setPhotos((current) => [result.photo!, ...current]);
+      setEditing(false);
+      setSuccess(true);
+      router.refresh();
+    } else {
+      setMutationError(result.error === 'auth' ? 'Tu sesión expiró.' : (result.error ?? 'Error'));
+    }
+  }
+
   function runMutation(photoId: string, action: () => Promise<{ ok: boolean; error?: string }>) {
     setMutationError(null);
+    setSuccess(false);
     setPendingAction(photoId);
     setPending(true);
     action().then((result) => {
@@ -82,29 +98,37 @@ export function PlayerPhotoGallery({
 
   return (
     <section className="d-block">
-      <h3>Galería de fotografías</h3>
-
-      <form
-        className="photo-upload"
-        action={formAction}
-        onSubmit={() => {
-          setMutationError(null);
-        }}
-      >
-        <label className="photo-input">
-          <span>Agregar foto (JPG, PNG o WEBP, máx. 8 MB)</span>
-          <input className="field-input" type="file" name="file" accept="image/jpeg,image/png,image/webp" />
-        </label>
-        <button className="btn-sm btn-approve" type="submit" disabled={pending}>
-          {pending ? 'Subiendo…' : 'Subir'}
+      <div className="section-heading">
+        <h3>Galería de fotografías</h3>
+        <button className="btn-sm btn-approve" onClick={() => setEditing(true)} disabled={pending}>
+          Agregar fotografía
         </button>
-      </form>
+      </div>
 
-      {state ? <p className="photo-success">✓ Fotografía guardada.</p> : null}
+      {success ? <p className="photo-success">✓ Fotografía guardada.</p> : null}
       {mutationError ? <p className="d-follow-err">{mutationError}</p> : null}
 
+      {editing ? (
+        <PhotoEditor
+          canPublish={canPublish}
+          onSave={handleSave}
+          onCancel={() => setEditing(false)}
+        />
+      ) : null}
+
+      {previewPhoto ? (
+        <div className="photo-preview-wrap">
+          <h4>Vista previa</h4>
+          <PhotoPreview
+            src={previewPhoto.credentialUrl || previewPhoto.url}
+            alt={`Fotografía de ${playerName ?? 'jugador'}`}
+            name={playerName}
+          />
+        </div>
+      ) : null}
+
       {photos.length === 0 ? (
-        <p className="d-note">Aún no hay fotografías. Sube la primera con el formulario.</p>
+        <p className="d-note">Aún no hay fotografías. Agrega la primera con el editor.</p>
       ) : (
         <div className="photo-grid">
           {photos.map((photo) => (
@@ -118,9 +142,10 @@ export function PlayerPhotoGallery({
                   loading="lazy"
                 />
               </a>
-              {photo.isPrimary ? (
-                <span className="photo-badge">Principal</span>
-              ) : null}
+              {photo.isPrimary ? <span className="photo-badge">Principal</span> : null}
+              <span className={`photo-visibility ${photo.visibility}`}>
+                {photo.visibility === 'public' ? 'Pública' : 'Privada'}
+              </span>
               <div className="photo-actions">
                 {!photo.isPrimary ? (
                   <button

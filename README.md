@@ -26,6 +26,7 @@ Base inicial de una plataforma multiorganización para torneos de fútbol.
 - ✅ Noticias por torneo (publicar/despublicar).
 - ✅ Web conectada a la API: catálogo, búsqueda/filtros/paginación, detalle con tabla y calendario, login/registro reales (sesión en cookie HTTP-only), «Mis torneos» y botón «Seguir».
 - ✅ App móvil conectada a la API: autenticación, catálogo con búsqueda, detalle (tabla/calendario), seguir torneo, «Mis torneos» y perfil.
+- ✅ Fotografías de jugador: editor de recorte 3:4 en la web y captura/galería en el móvil (subida, portada, eliminación); la API genera miniatura y una versión **credencial 3:4** con `sharp`. **Privacidad por consentimiento**: cada foto es `private` por defecto y solo `public` con `ConsentRecord(scope=photo_publication, granted=true)`; las privadas se sirven con URLs firmadas (HMAC `exp`+`sig`) y el perfil público usa `age` (no `dateOfBirth`) y oculta la foto si es privada.
 - ⏳ Pendiente: OAuth Google/Apple, validación de cupos (`maxTeams`), generador automático de calendarios, notificaciones (API + UI), desempates configurables, pruebas automatizadas, Swagger y CI/CD.
 
 ## Requisitos
@@ -61,6 +62,7 @@ Base inicial de una plataforma multiorganización para torneos de fútbol.
 ## Comandos útiles
 - `pnpm typecheck` — typecheck de api, web y mobile.
 - `pnpm lint` — ESLint (API y web).
+- `pnpm --filter @football/api test` — pruebas unitarias de la API (Vitest, Prisma mockeado; sin DB).
 - `pnpm --filter @football/api prisma:validate` — valida el esquema.
 
 ## API de autenticación (`/api/v1/auth`)
@@ -88,6 +90,14 @@ curl http://localhost:4000/api/v1/auth/me -H "Authorization: Bearer $TOKEN"
 ### Variables de entorno de JWT
 
 `JWT_ACCESS_SECRET` (obligatorio, secreto largo aleatorio) y `JWT_ACCESS_TTL` (por defecto `15m`).
+
+### Fotografías de jugador y privacidad
+
+- Endpoints (`/api/v1`): `GET/POST /players/:id/photos` (multipart, JPEG/PNG/WEBP ≤ 8 MB; `POST` acepta `makePublic`), `POST /players/:id/photos/:photoId/primary`, `DELETE /players/:id/photos/:photoId`.
+- Servido de medios: `GET /media/photos/:photoId`, `.../thumb` y `.../credential` (recorte 3:4, 600×800). Las fotos `public` se sirven directas; las `private` requieren firma válida (`?exp=<epoch>&sig=<hmac>`), si no responden `404`.
+- Firma: `MEDIA_URL_SECRET` (o, si falta, `JWT_ACCESS_SECRET`); TTL de 1 hora. En producción define `MEDIA_URL_SECRET` propio.
+- Publicación por consentimiento: una foto solo es `public` si el jugador es mayor de edad o existe `ConsentRecord(scope=photo_publication, granted=true)`; de lo contrario se guarda `private` aunque se solicite publicar.
+
 
 ### Google y Apple (pendiente de configuración)
 

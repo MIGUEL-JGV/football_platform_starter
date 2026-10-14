@@ -9,6 +9,15 @@ import { AuthUser } from '../common/decorators/current-user.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePlayerDto, ListPlayersQueryDto, UpdatePlayerDto } from './dto/player.dto';
 
+function calculateAge(dateOfBirth: Date, today = new Date()): number {
+  let age = today.getFullYear() - dateOfBirth.getFullYear();
+  const monthDiff = today.getMonth() - dateOfBirth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dateOfBirth.getDate())) {
+    age -= 1;
+  }
+  return age;
+}
+
 @Injectable()
 export class PlayersService {
   constructor(private readonly prisma: PrismaService) {}
@@ -80,6 +89,12 @@ export class PlayersService {
     if (!player) {
       throw new NotFoundException('Jugador no encontrado.');
     }
+
+    const primaryPhoto = await this.prisma.playerPhoto.findFirst({
+      where: { playerId: id, isPrimary: true },
+      select: { visibility: true },
+    });
+    const publicPhotoUrl = primaryPhoto?.visibility === 'public' ? player.photoUrl : null;
 
     const rosters = await this.prisma.teamRoster.findMany({
       where: { playerId: id },
@@ -164,7 +179,14 @@ export class PlayersService {
     }
 
     return {
-      player,
+      player: {
+        id: player.id,
+        displayName: player.displayName,
+        age: player.dateOfBirth ? calculateAge(player.dateOfBirth) : null,
+        photoUrl: publicPhotoUrl,
+        preferredPosition: player.preferredPosition,
+        createdAt: player.createdAt,
+      },
       teams: rosters.map((roster) => ({
         rosterId: roster.id,
         jerseyNumber: roster.jerseyNumber,

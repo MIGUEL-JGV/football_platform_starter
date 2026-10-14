@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Body,
   Controller,
   Delete,
   Get,
@@ -38,15 +39,21 @@ export class PlayerPhotosController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: AuthUser,
     @UploadedFile() file?: Express.Multer.File,
+    @Body('makePublic') makePublic?: string,
   ) {
     if (!file) {
       throw new BadRequestException('Debes adjuntar una imagen.');
     }
-    return this.photos.upload(id, user, {
-      buffer: file.buffer,
-      mimetype: file.mimetype,
-      size: file.size,
-    });
+    return this.photos.upload(
+      id,
+      user,
+      {
+        buffer: file.buffer,
+        mimetype: file.mimetype,
+        size: file.size,
+      },
+      makePublic === 'true' || makePublic === '1',
+    );
   }
 
   @HttpCode(HttpStatus.OK)

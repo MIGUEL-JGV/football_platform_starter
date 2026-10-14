@@ -3,6 +3,7 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'r
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ErrorBanner, Loading } from '../components/ui';
 import { getPlayerProfile, PlayerProfile } from '../api/tournaments';
+import { useAuth } from '../auth/AuthContext';
 import { RootStackParamList } from '../navigation/types';
 import { colors, formatDateTime, formatEvent } from '../theme';
 
@@ -17,6 +18,7 @@ const POSITION_LABELS: Record<string, string> = {
 
 export default function PlayerProfileScreen({ route, navigation }: Props) {
   const { playerId } = route.params;
+  const { token } = useAuth();
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -83,6 +85,21 @@ export default function PlayerProfileScreen({ route, navigation }: Props) {
             : 'Sin equipos registrados'}
         </Text>
       </View>
+
+      {token ? (
+        <Pressable
+          style={styles.photoButton}
+          onPress={() =>
+            navigation.navigate('PlayerPhoto', {
+              playerId: player.id,
+              playerName: player.displayName,
+              playerAge: player.age,
+            })
+          }
+        >
+          <Text style={styles.photoButtonText}>Gestionar fotografías</Text>
+        </Pressable>
+      ) : null}
 
       <Text style={styles.sectionTitle}>Estadísticas</Text>
       <View style={styles.statGrid}>
@@ -169,6 +186,14 @@ const styles = StyleSheet.create({
   title: { color: colors.white, fontSize: 28, fontWeight: '900', letterSpacing: -0.5, marginTop: 14 },
   subtitle: { color: '#cfdcd3', marginTop: 8, fontWeight: '600' },
   sectionTitle: { fontSize: 18, fontWeight: '900', color: colors.ink, marginTop: 22, marginBottom: 10 },
+  photoButton: {
+    backgroundColor: colors.green,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 14,
+  },
+  photoButtonText: { color: colors.white, fontWeight: '800', fontSize: 14 },
   statGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   stat: {
     flexGrow: 1,

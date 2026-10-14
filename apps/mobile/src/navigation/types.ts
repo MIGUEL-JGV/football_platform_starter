@@ -4,6 +4,7 @@ export type RootStackParamList = {
   MatchDetail: { tournamentId: string; matchId: string; name?: string };
   TeamProfile: { teamId: string; name?: string };
   PlayerProfile: { playerId: string; name?: string };
+  PlayerPhoto: { playerId: string; playerName?: string; playerAge?: number | null };
   Login: undefined;
   Register: undefined;
   CreateTournament: undefined;

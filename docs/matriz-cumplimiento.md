@@ -1,7 +1,9 @@
 # Matriz de cumplimiento — Especificación funcional vs. implementación
 
 Referencia: especificación funcional de la plataforma de torneos de fútbol (39 pantallas, 15 secciones).
-Última revisión: 2026-10-12.
+Última revisión: 2026-10-14.
+
+> Verificado 2026-10-14: migración `20261014000000_add_player_photo_visibility` (columna `visibility` + `credentialKey`) **aplicada** a PostgreSQL local. Comprobado de extremo a extremo vía API: subida privada/pública, bloqueo de publicación de menor sin consentimiento (`403`) y permisión con `ConsentRecord(scope=photo_publication)`, firma HMAC (`200` con firma válida / `404` sin firma, manipulada o vencida), dimensiones de credencial 600×800, miniatura 256×256 y principal ≤1024, `credentialKey` en DB y 3 archivos en disco, actualización de portada, borrado con limpieza de archivos, denegación de acceso (`403`) y perfil público con `age` (sin `dateOfBirth`) y `photoUrl` oculto si la primaria es privada. Web: galería renderizada para manager (badges Pública/Principal, editor disponible). Móvil: bundle Metro/iOS compila.
 
 Estados: **Implementado** (funciona de extremo a extremo) · **Parcial** (existe una parte, falta cobertura) · **Pendiente** (no existe) · **No verificado** (existe pero sin probar explícitamente).
 
@@ -45,14 +47,14 @@ partidos `finished` (no se persiste). Permisos validados en el servidor (servici
 | 2H | Detalle · Reglamento | Pendiente | `Tournament.rules` (JSON) existe; sin UI ni versionado. |
 | 3 | Detalle de partido | Implementado | Pantalla con marcador y cronología de eventos (Web y Móvil), enlazada desde calendario/resultados. |
 | 4 | Perfil de equipo | Implementado | Perfil público con rendimiento reciente, torneos, **Integrantes** (foto, dorsal, posición, edad; agrupados por torneo) y últimos partidos (Web y Móvil). |
-| 5 | Perfil de jugador | Implementado | Perfil público con estadísticas agregadas, equipos y últimos eventos (Web y Móvil). **Galería de fotografías** (subida, portada, eliminación; solo dueño/manager; optimización y miniatura server-side). |
+| 5 | Perfil de jugador | Implementado | Perfil público con estadísticas agregadas, equipos y últimos eventos (Web y Móvil). **Galería de fotografías** (subida, portada, eliminación; solo dueño/manager; optimización y miniatura server-side) con **editor de recorte 3:4 en web** y **captura/galería en móvil**; **privacidad por consentimiento** (privada por defecto; pública solo con `ConsentRecord scope=photo_publication`; URLs firmadas para privadas). |
 | 6 | Estadísticas generales | Parcial | Métricas agregadas de torneo (partidos, goles, promedio, resultados local/empate/visita) en `GET /stats`, presentadas con gráficos en Web y Móvil. Faltan más tipos de gráficos y export.
 | 7 | Registro e inicio de sesión | Parcial | Email/contraseña reales (Web + Móvil). Faltan: verificación de correo, OAuth Google/Apple, recuperación de contraseña, términos. |
 | 8 | Perfil y configuración | Parcial | Móvil muestra perfil + cerrar sesión. Faltan: editar datos, foto, cambiar contraseña, preferencias de notificación, privacidad, eliminar cuenta; Web sin página de perfil. |
 | 9 | Mis torneos (Organizo/Participo/Sigo) | Parcial | Web/Móvil listan; **no separan** las 3 categorías. API ya expone `canManage`/`myOrgRole` para clasificar "Organizo". |
 | 10 | Centro de notificaciones | Pendiente | Modelo `Notification` sin módulo/endpoints. |
 | 11 | Gestión de equipos | Parcial | API equipos (CRUD, `/teams/me`) Implementada; sin UI. |
-| 12 | Plantilla y jugadores | Parcial | API jugadores + roster (CRUD) Implementada; **plantilla enviada junto con el registro** (dorsal/posición, validación de club y dorsal duplicado); **editor de fotografías** (subida/servido/miniatura, permisos dueño/manager) Implementado; lectura pública vía perfil de equipo. Sin UI de edición de datos de jugador; sin reglas de duplicidad entre torneos. |
+| 12 | Plantilla y jugadores | Parcial | API jugadores + roster (CRUD) Implementada; **plantilla enviada junto con el registro** (dorsal/posición, validación de club y dorsal duplicado); **editor de fotografías** (subida/servido/miniatura + recorte 3:4 web/móvil, permisos dueño/manager, privacidad por consentimiento) Implementado; lectura pública vía perfil de equipo. Sin UI de edición de datos de jugador; sin reglas de duplicidad entre torneos. |
 | 13 | Inscripciones a torneos | Implementado | API aplicar **con plantilla** (jugadores del club + dorsal + posición) y **representante de contacto**; **invitaciones con enlace/QR** y **registro de equipo desde `/join/:token`** (2 pasos: equipo → plantilla con **consentimiento de menores**); listar/aprobar/**rechazar con motivo**/retirar; re-aplicación tras rechazo reemplaza la plantilla y limpia el motivo. |
 | 14 | Dashboard administrativo | Parcial | Hub `/panel` con organizaciones, torneos que administra y acceso a crear torneo; sin métricas ni widgets globales. |
 | 15 | Crear/configurar torneo | Parcial | API crear/editar Implementada (con `maxTeams`, `location`, `categoryLabel`, `minAge/maxAge`, `competitionFormat`) y **`POST /tournaments`** (organización personal); **UI web `/panel/torneos/nuevo`** Implementada. Faltan: wizard por pasos, criterios de desempate, duración, sustituciones, fechas bloqueadas. |
@@ -98,7 +100,7 @@ La mayoría "Parcial" lo es por falta de UI en áreas aún no exploradas (organi
 | `TournamentMember` | Implementado | manager/scorekeeper/viewer. |
 | `TournamentInvitation` | Implementado | Enlace/QR de inscripción; `tokenHash` SHA-256, `maxUses`, `usedCount`, `status`, `expiresAt`, `revokedAt`. |
 | `PlayerInvitation` | Parcial | Modelo creado para invitar jugadores; sin endpoints/módulo todavía. |
-| `PlayerPhoto` | Implementado | `storageKey`/`thumbKey`, dimensiones, `is_primary`; **`StorageService` (driver local, sustituible) + `sharp` (webp optimizada, EXIF/GPS removidos, miniatura)**; endpoints de subida/listado/portada/eliminación y servido público `GET /media/photos/:id(/thumb)`. Sin expiration/privacidad. |
+| `PlayerPhoto` | Implementado | `storageKey`/`thumbKey`/`credentialKey`, dimensiones, `is_primary`, **`visibility` (`private`/`public`)**; **`StorageService` (driver local, sustituible) + `sharp` (webp optimizada, EXIF/GPS removidos, miniatura, credencial 3:4)**; endpoints de subida/listado/portada/eliminación y servido `GET /media/photos/:id(/thumb\|/credential)`. Privacidad por consentimiento + URLs firmadas (HMAC `exp`+`sig`). |
 | `PlayerDocument` | Parcial | Modelo creado (docType, status); sin endpoints. |
 | `ConsentRecord` | Implementado | **Creación en el registro** (menores: tutor + parentesco + doc.), `scope=registration`, únicos por `(player, tournamentTeam, scope)`; expuestos en `GET .../entries/:entryId/roster`. Sin expiración/revocación. |
 | `AuditLog` | Parcial | Modelo creado; sin servicio ni endpoints de consulta/escritura.
@@ -133,7 +135,7 @@ se capturaron; hoy solo hay clasificación, que no aplica).
 - **Equipos**: `GET /teams`, `GET /teams/me`, `POST /teams`, `GET/PATCH/DELETE /teams/:id`, `GET /teams/:id/profile` (público; incluye `players` e `squads` con integrantes).
 - **Estadísticas**: `GET /tournaments/:id/stats` (público; goleo, asistencias, disciplina, por equipo).
 - **Jugadores**: `GET/POST /players`, `GET/PATCH/DELETE /players/:id`, `GET /players/:id/profile` (público).
-- **Fotografías de jugador**: `GET/POST /players/:id/photos` (multipart, JPEG/PNG/WEBP ≤8 MB), `POST .../photos/:photoId/primary`, `DELETE .../photos/:photoId` (permisos: `Player.createdBy` o manager del torneo del roster); servido público `GET /media/photos/:photoId` y `.../thumb` (webp optimizada con `sharp`; `Player.photoUrl` apunta a la primaria).
+- **Fotografías de jugador**: `GET/POST /players/:id/photos` (multipart, JPEG/PNG/WEBP ≤8 MB; `POST` acepta `makePublic`), `POST .../photos/:photoId/primary`, `DELETE .../photos/:photoId` (permisos: `Player.createdBy` o manager del torneo del roster); servido `GET /media/photos/:photoId`, `.../thumb` y `.../credential` (recorte 3:4 con `sharp`). Las fotos `public` se sirven directas; las `private` exigen firma `?exp=&sig=` (HMAC, TTL 1 h) o responden `404`; `Player.photoUrl` apunta a la primaria y es `null` si es privada.
 - **Sedes**: `GET/POST /organizations/:organizationId/venues`, `GET/PATCH/DELETE .../venues/:venueId`.
 - **Calendario**: `GET/POST/PATCH/DELETE /tournaments/:id/phases`, `.../phases/:phaseId/matchdays`.
 - **Partidos**: `GET/POST /tournaments/:id/matches`, `GET/PATCH/DELETE .../matches/:matchId`, `POST .../result`, `.../result/validate`, `.../result/clear` (registro con marcador de penales si aplica, versionado de resultados).
@@ -166,7 +168,7 @@ se capturaron; hoy solo hay clasificación, que no aplica).
 | Distinguir cero de dato desconocido | Pendiente. |
 | Control de modificaciones (quién/cuándo/por qué) | Parcial (modelo `AuditLog` creado; sin escritura/consulta). |
 | Permisos por función validados en servidor | Implementado (servicios + guards). |
-| Pruebas automatizadas (unit de servicios API) | Implementado (Vitest con Prisma mockeado, sin DB: 46 tests en 6 suites — accesos a torneo, registro/plantilla/consentimiento, resultados, eventos, noticias, invitaciones). |
+| Pruebas automatizadas (unit de servicios API) | Implementado (Vitest con Prisma mockeado, sin DB: 69 tests en 8 suites — accesos a torneo, registro/plantilla/consentimiento, resultados, eventos, noticias, invitaciones, autorizaciones y **fotografías de jugador**). |
 | Integridad del calendario (sin duplicados) | Parcial (FKs compuestas; sin validación de choques). |
 | Experiencia móvil de captura | Pendiente. |
 

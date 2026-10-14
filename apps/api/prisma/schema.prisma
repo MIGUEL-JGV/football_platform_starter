@@ -499,10 +499,12 @@ model PlayerPhoto {
   tournamentTeamId String?        @map("tournament_team_id") @db.Uuid
   storageKey       String         @map("storage_key")
   thumbKey         String?        @map("thumb_key")
+  credentialKey    String?        @map("credential_key")
   mimeType         String         @map("mime_type") @db.VarChar(60)
   width            Int
   height           Int
   sizeBytes        Int            @map("size_bytes")
+  visibility       String         @default("private") @db.VarChar(20)
   isPrimary        Boolean        @default(true) @map("is_primary")
   uploadedBy       String         @map("uploaded_by") @db.Uuid
   createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz

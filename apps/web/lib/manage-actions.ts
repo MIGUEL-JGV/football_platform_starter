@@ -532,8 +532,9 @@ export async function uploadPhotoAction(
   if (!(file instanceof File) || file.size === 0) {
     return { ok: false, error: 'Selecciona una imagen para subir.' };
   }
+  const makePublic = formData.get('makePublic') === 'true';
   try {
-    const photo = await uploadPlayerPhoto(token, playerId, file);
+    const photo = await uploadPlayerPhoto(token, playerId, file, makePublic);
     revalidatePath(`/players/${playerId}`);
     return { ok: true, photo };
   } catch (error) {

@@ -12,6 +12,7 @@ import TournamentDetailScreen from './src/screens/TournamentDetailScreen';
 import MatchDetailScreen from './src/screens/MatchDetailScreen';
 import TeamProfileScreen from './src/screens/TeamProfileScreen';
 import PlayerProfileScreen from './src/screens/PlayerProfileScreen';
+import PlayerPhotoScreen from './src/screens/PlayerPhotoScreen';
 import LoginScreen from './src/screens/LoginScreen';
 import RegisterScreen from './src/screens/RegisterScreen';
 import MyTournamentsScreen from './src/screens/MyTournamentsScreen';
@@ -111,6 +112,11 @@ export default function App() {
               name="PlayerProfile"
               component={PlayerProfileScreen}
               options={{ title: 'Jugador' }}
+            />
+            <Stack.Screen
+              name="PlayerPhoto"
+              component={PlayerPhotoScreen}
+              options={{ title: 'Fotografías' }}
             />
             <Stack.Screen
               name="Login"

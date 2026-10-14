@@ -88,6 +88,8 @@ export default async function PlayerProfilePage({ params }: { params: Params }) 
         playerId={player.id}
         initialPhotos={photos}
         canManage={canManagePhotos}
+        playerName={player.displayName}
+        playerAge={player.age}
       />
 
       <section className="d-block">

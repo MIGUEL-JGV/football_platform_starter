@@ -58,3 +58,54 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
   return data as T;
 }
+
+export interface UploadFile {
+  uri: string;
+  name: string;
+  type: string;
+}
+
+export async function apiUpload<T>(
+  path: string,
+  token: string,
+  file: UploadFile,
+  fields: Record<string, string> = {},
+): Promise<T> {
+  const formData = new FormData();
+  for (const [key, value] of Object.entries(fields)) {
+    formData.append(key, value);
+  }
+  formData.append('file', file as unknown as Blob);
+
+  const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+  const authorizationToken = getAuthorizationToken();
+  if (authorizationToken) headers['X-Authorization-Token'] = authorizationToken;
+
+  const response = await fetch(`${getApiBaseUrl()}/api/v1${path}`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+
+  const text = await response.text();
+  let data: unknown = null;
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = null;
+    }
+  }
+
+  if (!response.ok) {
+    const payload = data as { message?: string; code?: string; errors?: string[] } | null;
+    throw new ApiError(
+      payload?.message ?? `Error de red (${response.status})`,
+      response.status,
+      payload?.code ?? 'ERROR',
+      payload?.errors,
+    );
+  }
+
+  return data as T;
+}

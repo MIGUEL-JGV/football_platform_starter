@@ -749,11 +749,13 @@ export interface PlayerPhoto {
   id: string;
   playerId: string;
   isPrimary: boolean;
+  visibility: 'public' | 'private';
   width: number;
   height: number;
   sizeBytes: number;
   url: string;
   thumbUrl: string;
+  credentialUrl: string;
   createdAt: string;
 }
 
@@ -764,10 +766,12 @@ export function listPlayerPhotos(token: string, playerId: string): Promise<Playe
 export async function uploadPlayerPhoto(
   token: string,
   playerId: string,
-  file: File,
+  file: Blob | File,
+  makePublic = false,
 ): Promise<PlayerPhoto> {
   const formData = new FormData();
-  formData.append('file', file);
+  formData.append('file', file, file instanceof File ? file.name : 'photo.webp');
+  formData.append('makePublic', makePublic ? 'true' : 'false');
   return upload<PlayerPhoto>(`/players/${playerId}/photos`, token, formData);
 }
 

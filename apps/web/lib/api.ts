@@ -482,7 +482,7 @@ export interface PlayerProfile {
   player: {
     id: string;
     displayName: string;
-    dateOfBirth: string | null;
+    age: number | null;
     photoUrl: string | null;
     preferredPosition: string | null;
     createdAt: string;
